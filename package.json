@@ -2,6 +2,9 @@
   "name": "haatza_backend",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=26.13.0"
+  },
   "scripts": {
     "dev": "nest start --watch",
     "start:dev": "nest start --watch",
@@ -34,6 +37,6 @@
     "@types/node": "^20",
     "eslint": "^9",
     "prisma": "^7.10.1",
-    "typescript": "^5"
+    "typescript": "^6.0.2"
   }
 }
