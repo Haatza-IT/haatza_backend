@@ -1,32 +1,35 @@
 import { Injectable, NotFoundException, Inject } from '@nestjs/common';
 import { UserMasterRepository } from '../../database/user-master.repository';
-import { sanitizeUserResponse } from '../../common/utils/sanitizer.util';
-import { USER_MASTER_MESSAGES } from '../../common/constants/user-master.constants';
-import type { EmployeeUpdateDto, SanitizedUser } from '../user-master/user-master.types';
+import type { EmployeeUpdateDto, EmployeeResponse, SanitizedEmployee } from './employees.types';
+import { EMPLOYEE_MESSAGES } from './employees.types';
 
 @Injectable()
 export class EmployeesService {
   constructor(
     @Inject(UserMasterRepository)
-    private readonly userRepository: UserMasterRepository
+    private readonly userRepository: UserMasterRepository,
   ) {}
+
+  /**
+   * Sanitizes employee response: strips password.
+   */
+  private sanitizeEmployee(user: any): SanitizedEmployee {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _password, ...safeData } = user;
+    return safeData as SanitizedEmployee;
+  }
 
   /**
    * Updates an existing user's employee status in the user_masters table.
    * Touches ONLY the isHaatzaEmployee column; all other roles remain untouched.
    */
-  async updateEmployeeStatus(dto: EmployeeUpdateDto): Promise<{
-    success: boolean;
-    message: string;
-    data: SanitizedUser;
-  }> {
-    // 1. Check if user exists in database through repository
+  async updateEmployeeStatus(dto: EmployeeUpdateDto): Promise<EmployeeResponse> {
+    // 1. Verify user exists in database
     const existing = await this.userRepository.findById(dto.userId);
-
     if (!existing) {
       throw new NotFoundException({
         success: false,
-        message: USER_MASTER_MESSAGES.USER_NOT_FOUND,
+        message: EMPLOYEE_MESSAGES.USER_NOT_FOUND,
         errors: [],
       });
     }
@@ -34,13 +37,13 @@ export class EmployeesService {
     // 2. Update ONLY the isHaatzaEmployee field
     const updated = await this.userRepository.updateEmployeeRole(
       dto.userId,
-      dto.isHaatzaEmployee
+      dto.isHaatzaEmployee,
     );
 
     return {
       success: true,
-      message: USER_MASTER_MESSAGES.EMPLOYEE_UPDATED_SUCCESS,
-      data: sanitizeUserResponse(updated),
+      message: EMPLOYEE_MESSAGES.UPDATED_SUCCESS,
+      data: this.sanitizeEmployee(updated),
     };
   }
 }

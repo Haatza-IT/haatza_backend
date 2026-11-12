@@ -1,4 +1,6 @@
-import type { UserMaster, SanitizedUser } from '../../modules/user-master/user-master.types';
+import type { UserMaster } from '../../generated/prisma/client';
+
+export type SanitizedUser = Omit<UserMaster, 'password'>;
 
 /**
  * Masks a bank account number, preserving only the last 4 digits.
@@ -25,4 +27,3 @@ export function sanitizeUserResponse(user: UserMaster): SanitizedUser {
     accountNumber: maskAccountNumber(safeData.accountNumber),
   };
 }
-

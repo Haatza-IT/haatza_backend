@@ -1,5 +1,7 @@
 import 'reflect-metadata';
 import 'dotenv/config';
+import express from 'express';
+import helmet from 'helmet';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -25,7 +27,30 @@ function getAllowedOrigins(): string[] {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Explicit body parser control to avoid double-parsing or conflicts
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+
+  // 1. Explicit JSON & URL-encoded request body size limit (100KB)
+  // Rejects oversized request bodies with HTTP 413 Payload Too Large
+  app.use(express.json({ limit: '100kb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
+  // 2. HTTP Security Headers via Helmet
+  // Configured specifically for high-security JSON REST API operations
+  app.use(
+    helmet({
+      contentSecurityPolicy: false, // Pure JSON API: avoids injecting HTML CSP directives
+      crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allows cross-origin API consumers
+      hsts: {
+        maxAge: 31536000, // 1 year Strict-Transport-Security on current host
+        includeSubDomains: false, // Safe: avoids inadvertently forcing HTTPS across unconfigured subdomains
+        preload: false, // Safe: avoids permanent submission to browser preload list before domain readiness
+      },
+      frameguard: { action: 'deny' }, // Clickjacking protection (X-Frame-Options: DENY)
+      noSniff: true, // MIME-sniffing protection (X-Content-Type-Options: nosniff)
+      hidePoweredBy: true, // Strips X-Powered-By: Express
+    }),
+  );
 
   // Enable graceful shutdown hooks for SIGTERM / SIGINT (critical for Docker & cloud runners)
   app.enableShutdownHooks();

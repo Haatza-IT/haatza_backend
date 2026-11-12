@@ -6,7 +6,6 @@ import {
   passcodeSchema,
   latitudeSchema,
   longitudeSchema,
-  uuidSchema,
 } from '../../common/validations/common.validation';
 import {
   accountNumberSchema,
@@ -17,20 +16,6 @@ import {
   gstinSchema,
 } from '../../common/validations/tax.validation';
 
-// API 1: Haatza Member Registration Schema
-export const memberRegistrationSchema = z
-  .object({
-    name: z.string().trim().min(1, 'Name is required'),
-    email: emailSchema,
-    phoneNumber: phoneSchema,
-    passcode: passcodeSchema,
-    status: z.boolean().optional().default(true),
-    referral: z.string().trim().optional(),
-    fcmToken: z.string().trim().optional().nullable(),
-  })
-  .strict();
-
-// API 2: Haatza Seller Registration Schema
 export const sellerRegistrationSchema = z
   .object({
     // User Details
@@ -77,19 +62,5 @@ export const sellerRegistrationSchema = z
     }
   });
 
-// API 3: Haatza Employee Role Update Schema
-export const employeeUpdateSchema = z
-  .object({
-    userId: uuidSchema,
-    isHaatzaEmployee: z.boolean(),
-  })
-  .strict();
-
-// API 4: Haatza Nest Expert Role Update Schema
-export const nestExpertUpdateSchema = z
-  .object({
-    userId: uuidSchema,
-    isNestExpert: z.boolean(),
-  })
-  .strict();
+export type SellerRegistrationInput = z.infer<typeof sellerRegistrationSchema>;
 

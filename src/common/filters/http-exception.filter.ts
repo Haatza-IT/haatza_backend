@@ -49,12 +49,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
           });
         }
 
-        const message =
+        let message =
           typeof respObj.message === 'string'
             ? respObj.message
             : Array.isArray(respObj.message)
               ? respObj.message.join(', ')
               : httpEx.message;
+
+        if (status === 413 || (typeof message === 'string' && message.includes('too large'))) {
+          message = 'Payload too large: Request body exceeds the 100KB size limit';
+        }
 
         return response.status(status).json({
           success: false,
@@ -63,14 +67,46 @@ export class HttpExceptionFilter implements ExceptionFilter {
         });
       }
 
+      const rawMsg = typeof exceptionResponse === 'string' ? exceptionResponse : httpEx.message;
+      const message =
+        status === 413 || (typeof rawMsg === 'string' && rawMsg.includes('too large'))
+          ? 'Payload too large: Request body exceeds the 100KB size limit'
+          : rawMsg;
+
       return response.status(status).json({
         success: false,
-        message: typeof exceptionResponse === 'string' ? exceptionResponse : httpEx.message,
+        message,
         errors: [],
       });
     }
 
-    // 2. Database or unexpected runtime errors
+    // 2. Express middleware errors with HTTP status (e.g. body-parser 413 Payload Too Large)
+    const errObj = exception as Record<string, unknown> | null;
+    const rawStatus =
+      errObj && typeof errObj === 'object'
+        ? (errObj.status || errObj.statusCode)
+        : null;
+
+    if (typeof rawStatus === 'number' && rawStatus >= 400 && rawStatus < 600) {
+      const isEntityTooLarge =
+        rawStatus === 413 ||
+        errObj?.type === 'entity.too.large' ||
+        (typeof errObj?.message === 'string' && errObj.message.includes('too large'));
+
+      const message = isEntityTooLarge
+        ? 'Payload too large: Request body exceeds the 100KB size limit'
+        : typeof errObj?.message === 'string'
+          ? errObj.message
+          : 'Request error';
+
+      return response.status(rawStatus).json({
+        success: false,
+        message,
+        errors: [],
+      });
+    }
+
+    // 3. Database or unexpected runtime errors
     const dbErr = handleDatabaseError(exception);
     return response.status(dbErr.status).json({
       success: false,

@@ -2,56 +2,66 @@ import { Injectable, ConflictException, Inject } from '@nestjs/common';
 import crypto from 'crypto';
 import { UserMasterRepository } from '../../database/user-master.repository';
 import { hashPassword } from '../../common/utils/password.util';
-import { generateRandomReferralCode } from '../../common/utils/code-generator.util';
-import { sanitizeUserResponse } from '../../common/utils/sanitizer.util';
-import { USER_MASTER_CONSTANTS, USER_MASTER_MESSAGES } from '../../common/constants/user-master.constants';
-import type { MemberRegistrationDto, SanitizedUser } from '../user-master/user-master.types';
+import type { MemberRegistrationDto, MemberResponse, SanitizedMember } from './members.types';
+import { MEMBER_MESSAGES } from './members.types';
 
 @Injectable()
 export class MembersService {
+  private readonly MAX_RETRIES = 10;
+
   constructor(
     @Inject(UserMasterRepository)
-    private readonly userRepository: UserMasterRepository
+    private readonly userRepository: UserMasterRepository,
   ) {}
 
   /**
-   * Generates a collision-safe unique referral code.
+   * Generates a unique referral code starting with 'HZ'.
+   * Owned exclusively by Members business logic.
    */
-  async getUniqueReferralCode(): Promise<string> {
-    for (let i = 0; i < USER_MASTER_CONSTANTS.MAX_ID_GENERATION_RETRIES; i++) {
-      const candidate = generateRandomReferralCode();
-      const existing = await this.userRepository.checkReferralCodeExists(candidate);
-      if (!existing) {
-        return candidate;
+  async generateUniqueReferralCode(): Promise<string> {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let attempt = 0; attempt < this.MAX_RETRIES; attempt++) {
+      let code = 'HZ';
+      const bytes = crypto.randomBytes(6);
+      for (let i = 0; i < 6; i++) {
+        code += chars[bytes[i] % chars.length];
+      }
+      const exists = await this.userRepository.checkReferralCodeExists(code);
+      if (!exists) {
+        return code;
       }
     }
     return `HZ${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
   }
 
   /**
+   * Sanitizes member data for API responses (stripping password).
+   */
+  private sanitizeMember(user: any): SanitizedMember {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _password, ...safeData } = user;
+    return safeData as SanitizedMember;
+  }
+
+  /**
    * Registers a new Haatza Member.
    */
-  async registerMember(dto: MemberRegistrationDto): Promise<{
-    success: boolean;
-    message: string;
-    data: SanitizedUser;
-  }> {
-    // 1. Pre-check email or phone conflicts
+  async registerMember(dto: MemberRegistrationDto): Promise<MemberResponse> {
+    // 1. Conflict detection for email or phone
     const existing = await this.userRepository.findByEmailOrPhone(dto.email, dto.phoneNumber);
-
     if (existing) {
       if (existing.email === dto.email) {
         throw new ConflictException({
           success: false,
-          message: USER_MASTER_MESSAGES.EMAIL_ALREADY_EXISTS,
-          errors: [{ field: 'email', message: USER_MASTER_MESSAGES.EMAIL_ALREADY_EXISTS }],
+          message: MEMBER_MESSAGES.EMAIL_ALREADY_EXISTS,
+          errors: [{ field: 'email', message: MEMBER_MESSAGES.EMAIL_ALREADY_EXISTS }],
         });
       }
       if (existing.phoneNumber === dto.phoneNumber) {
         throw new ConflictException({
           success: false,
-          message: USER_MASTER_MESSAGES.PHONE_ALREADY_EXISTS,
-          errors: [{ field: 'phoneNumber', message: USER_MASTER_MESSAGES.PHONE_ALREADY_EXISTS }],
+          message: MEMBER_MESSAGES.PHONE_ALREADY_EXISTS,
+          errors: [{ field: 'phoneNumber', message: MEMBER_MESSAGES.PHONE_ALREADY_EXISTS }],
         });
       }
     }
@@ -60,24 +70,25 @@ export class MembersService {
     const hashedPassword = await hashPassword(dto.passcode);
 
     // 3. Generate unique referral code
-    const referralCode = await this.getUniqueReferralCode();
+    const referralCode = await this.generateUniqueReferralCode();
 
-    // 4. Create record in user_masters table through repository
-    const newUser = await this.userRepository.createMember({
+    // 4. Persist to database
+    const createdUser = await this.userRepository.createMember({
       name: dto.name,
       email: dto.email,
       phoneNumber: dto.phoneNumber,
       password: hashedPassword,
       referralCode,
-      referredByCode: dto.referral || null,
+      referredByCode: dto.referral && dto.referral.trim().length > 0 ? dto.referral.trim() : null,
       fcmToken: dto.fcmToken ?? null,
-      status: dto.status ?? USER_MASTER_CONSTANTS.DEFAULT_STATUS,
+      status: dto.status ?? true,
     });
 
+    // 5. Return sanitized response
     return {
       success: true,
-      message: USER_MASTER_MESSAGES.MEMBER_REGISTERED_SUCCESS,
-      data: sanitizeUserResponse(newUser),
+      message: MEMBER_MESSAGES.REGISTERED_SUCCESS,
+      data: this.sanitizeMember(createdUser),
     };
   }
 }

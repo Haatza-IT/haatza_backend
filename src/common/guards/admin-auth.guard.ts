@@ -6,6 +6,25 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Request } from 'express';
+import * as crypto from 'crypto';
+
+/**
+ * Timing-safe string comparison to protect against timing side-channel attacks.
+ * Both strings are hashed using SHA-256 before comparison via crypto.timingSafeEqual,
+ * ensuring:
+ * 1. Constant 32-byte buffers regardless of input lengths.
+ * 2. Constant-time comparison execution.
+ * 3. Never throws TypeError from buffer length differences.
+ * 4. Zero information leakage about key length or content.
+ */
+function timingSafeCompare(supplied: string, expected: string): boolean {
+  if (typeof supplied !== 'string' || typeof expected !== 'string') {
+    return false;
+  }
+  const hashA = crypto.createHash('sha256').update(supplied).digest();
+  const hashB = crypto.createHash('sha256').update(expected).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
 
 /**
  * NestJS Guard that secures administrative endpoints.
@@ -16,8 +35,9 @@ import { Request } from 'express';
  * Security:
  * - Reads expected key from `ADMIN_API_KEY` in environment.
  * - ZERO hardcoded fallback secrets: fails closed if ADMIN_API_KEY is not defined.
- * - Missing key: 401 Unauthorized.
- * - Invalid key: 403 Forbidden.
+ * - Missing credentials: 401 Unauthorized.
+ * - Incorrect credentials: 403 Forbidden.
+ * - Timing-safe comparison prevents timing attack enumeration.
  */
 @Injectable()
 export class AdminAuthGuard implements CanActivate {
@@ -42,7 +62,7 @@ export class AdminAuthGuard implements CanActivate {
     }
 
     // 1. Missing Key Check (401 Unauthorized)
-    if (!suppliedKey) {
+    if (!suppliedKey || suppliedKey.length === 0) {
       throw new UnauthorizedException({
         success: false,
         message: 'Authentication required: Admin API key is missing. Provide x-admin-key or Authorization Bearer header.',
@@ -61,8 +81,8 @@ export class AdminAuthGuard implements CanActivate {
       });
     }
 
-    // 3. Key Mismatch Check (403 Forbidden)
-    if (suppliedKey !== expectedSecret) {
+    // 3. Timing-Safe Key Verification (403 Forbidden on mismatch)
+    if (!timingSafeCompare(suppliedKey, expectedSecret.trim())) {
       throw new ForbiddenException({
         success: false,
         message: 'Forbidden: Insufficient permissions',
@@ -73,4 +93,5 @@ export class AdminAuthGuard implements CanActivate {
     return true;
   }
 }
+
 

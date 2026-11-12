@@ -1,17 +1,5 @@
 import type { UserMaster } from '../../generated/prisma/client';
 
-export type { UserMaster };
-
-export interface MemberRegistrationDto {
-  name: string;
-  email: string;
-  phoneNumber: string;
-  passcode: string;
-  status?: boolean;
-  referral?: string;
-  fcmToken?: string | null;
-}
-
 export interface SellerRegistrationDto {
   name: string;
   email: string;
@@ -40,17 +28,16 @@ export interface SellerRegistrationDto {
   isGSTRegistered?: boolean;
 }
 
-export interface EmployeeUpdateDto {
-  userId: string;
-  isHaatzaEmployee: boolean;
+export type SanitizedSeller = Omit<UserMaster, 'password'>;
+
+export interface SellerResponse {
+  success: boolean;
+  message: string;
+  data: SanitizedSeller;
 }
 
-export interface NestExpertUpdateDto {
-  userId: string;
-  isNestExpert: boolean;
-}
-
-export type SanitizedUser = Omit<UserMaster, 'password'> & {
-  accountNumber?: string | null;
-};
-
+export const SELLER_MESSAGES = {
+  REGISTERED_SUCCESS: 'Haatza seller registered successfully',
+  EMAIL_ALREADY_EXISTS: 'Email already exists',
+  PHONE_ALREADY_EXISTS: 'Phone number already exists',
+} as const;

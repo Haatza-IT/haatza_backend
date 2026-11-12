@@ -2,47 +2,45 @@ import { Injectable, ConflictException, Inject } from '@nestjs/common';
 import crypto from 'crypto';
 import { UserMasterRepository } from '../../database/user-master.repository';
 import { hashPassword } from '../../common/utils/password.util';
-import {
-  generateRandomReferralCode,
-  generateRandomSellerId,
-} from '../../common/utils/code-generator.util';
-import { sanitizeUserResponse } from '../../common/utils/sanitizer.util';
-import {
-  USER_MASTER_CONSTANTS,
-  USER_MASTER_MESSAGES,
-} from '../../common/constants/user-master.constants';
-import type {
-  SellerRegistrationDto,
-  SanitizedUser,
-} from '../user-master/user-master.types';
+import type { SellerRegistrationDto, SellerResponse, SanitizedSeller } from './sellers.types';
+import { SELLER_MESSAGES } from './sellers.types';
 
 @Injectable()
 export class SellersService {
+  private readonly MAX_RETRIES = 10;
+
   constructor(
     @Inject(UserMasterRepository)
-    private readonly userRepository: UserMasterRepository
+    private readonly userRepository: UserMasterRepository,
   ) {}
 
   /**
-   * Generates a collision-safe unique referral code.
+   * Generates a unique referral code starting with 'HZ'.
    */
-  async getUniqueReferralCode(): Promise<string> {
-    for (let i = 0; i < USER_MASTER_CONSTANTS.MAX_ID_GENERATION_RETRIES; i++) {
-      const candidate = generateRandomReferralCode();
-      const existing = await this.userRepository.checkReferralCodeExists(candidate);
+  async generateUniqueReferralCode(): Promise<string> {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    for (let i = 0; i < this.MAX_RETRIES; i++) {
+      let code = 'HZ';
+      const bytes = crypto.randomBytes(6);
+      for (let j = 0; j < 6; j++) {
+        code += chars[bytes[j] % chars.length];
+      }
+      const existing = await this.userRepository.checkReferralCodeExists(code);
       if (!existing) {
-        return candidate;
+        return code;
       }
     }
     return `HZ${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
   }
 
   /**
-   * Generates a collision-safe unique seller ID.
+   * Generates a unique seller ID starting with 'HSL-'.
+   * Owned exclusively by Seller business logic.
    */
-  async getUniqueSellerId(): Promise<string> {
-    for (let i = 0; i < USER_MASTER_CONSTANTS.MAX_ID_GENERATION_RETRIES; i++) {
-      const candidate = generateRandomSellerId();
+  async generateUniqueSellerId(): Promise<string> {
+    for (let i = 0; i < this.MAX_RETRIES; i++) {
+      const hex = crypto.randomBytes(4).toString('hex').toUpperCase();
+      const candidate = `HSL-${hex}`;
       const existing = await this.userRepository.checkSellerIdExists(candidate);
       if (!existing) {
         return candidate;
@@ -52,55 +50,96 @@ export class SellersService {
   }
 
   /**
+   * Masks a bank account number, preserving only the last 4 digits.
+   * Example: '50100123456789' -> 'XXXXXXXXXX6789'
+   */
+  private maskAccountNumber(accountNumber?: string | null): string | null {
+    if (!accountNumber) return null;
+    const trimmed = accountNumber.trim();
+    if (trimmed.length <= 4) {
+      return 'X'.repeat(trimmed.length);
+    }
+    return 'X'.repeat(trimmed.length - 4) + trimmed.slice(-4);
+  }
+
+  /**
+   * Sanitizes seller response: strips password and masks bank account number.
+   */
+  private sanitizeSeller(user: any): SanitizedSeller {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _password, ...safeData } = user;
+    return {
+      ...safeData,
+      accountNumber: this.maskAccountNumber(safeData.accountNumber),
+    } as SanitizedSeller;
+  }
+
+  /**
    * Registers a Haatza Seller with full profile, tax, and banking details.
    */
-  async registerSeller(dto: SellerRegistrationDto): Promise<{
-    success: boolean;
-    message: string;
-    data: SanitizedUser;
-  }> {
-    // 1. Pre-check email or phone conflicts
+  async registerSeller(dto: SellerRegistrationDto): Promise<SellerResponse> {
+    // 1. Conflict detection for email or phone
     const existing = await this.userRepository.findByEmailOrPhone(dto.email, dto.phoneNumber);
-
     if (existing) {
       if (existing.email === dto.email) {
         throw new ConflictException({
           success: false,
-          message: USER_MASTER_MESSAGES.EMAIL_ALREADY_EXISTS,
-          errors: [{ field: 'email', message: USER_MASTER_MESSAGES.EMAIL_ALREADY_EXISTS }],
+          message: SELLER_MESSAGES.EMAIL_ALREADY_EXISTS,
+          errors: [{ field: 'email', message: SELLER_MESSAGES.EMAIL_ALREADY_EXISTS }],
         });
       }
       if (existing.phoneNumber === dto.phoneNumber) {
         throw new ConflictException({
           success: false,
-          message: USER_MASTER_MESSAGES.PHONE_ALREADY_EXISTS,
-          errors: [{ field: 'phoneNumber', message: USER_MASTER_MESSAGES.PHONE_ALREADY_EXISTS }],
+          message: SELLER_MESSAGES.PHONE_ALREADY_EXISTS,
+          errors: [{ field: 'phoneNumber', message: SELLER_MESSAGES.PHONE_ALREADY_EXISTS }],
         });
       }
     }
 
-    // 2. Hash password with bcrypt (12 rounds)
+    // 2. Hash passcode with bcrypt (12 rounds)
     const hashedPassword = await hashPassword(dto.passcode);
 
-    // 3. Generate unique sellerId and referralCode in parallel
-    const [sellerId, referralCode] = await Promise.all([
-      this.getUniqueSellerId(),
-      this.getUniqueReferralCode(),
-    ]);
+    // 3. Generate unique sellerId and referralCode
+    const sellerId = await this.generateUniqueSellerId();
+    const referralCode = await this.generateUniqueReferralCode();
 
-    // 4. Create record in user_masters table through repository
-    const newSeller = await this.userRepository.createSeller({
-      ...dto,
+    // 4. Persist to database
+    const createdSeller = await this.userRepository.createSeller({
+      name: dto.name,
+      email: dto.email,
+      phoneNumber: dto.phoneNumber,
       password: hashedPassword,
-      sellerId,
       referralCode,
-      referredByCode: dto.referral || null,
+      referredByCode: dto.referral && dto.referral.trim().length > 0 ? dto.referral.trim() : null,
+      fcmToken: dto.fcmToken ?? null,
+      sellerId,
+      sellerAddress1: dto.sellerAddress1 ?? null,
+      sellerAddress2: dto.sellerAddress2 ?? null,
+      city: dto.city ?? null,
+      state: dto.state ?? null,
+      country: dto.country ?? null,
+      pinCode: dto.pinCode ?? null,
+      sellerPickupAddress: dto.sellerPickupAddress ?? null,
+      pickupLocationId: dto.pickupLocationId ?? null,
+      latitude: dto.latitude ?? null,
+      longitude: dto.longitude ?? null,
+      bankName: dto.bankName ?? null,
+      accountHolderName: dto.accountHolderName ?? null,
+      accountNumber: dto.accountNumber ?? null,
+      ifscCode: dto.ifscCode ?? null,
+      accountManager: dto.accountManager ?? null,
+      gstin: dto.gstin ?? null,
+      companyName: dto.companyName ?? null,
+      panNumber: dto.panNumber ?? null,
+      isGSTRegistered: dto.isGSTRegistered ?? false,
     });
 
+    // 5. Return sanitized response
     return {
       success: true,
-      message: USER_MASTER_MESSAGES.SELLER_REGISTERED_SUCCESS,
-      data: sanitizeUserResponse(newSeller),
+      message: SELLER_MESSAGES.REGISTERED_SUCCESS,
+      data: this.sanitizeSeller(createdSeller),
     };
   }
 }
