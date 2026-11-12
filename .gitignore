@@ -19,6 +19,7 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -41,3 +42,14 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# editor & agent tooling
+.agents/
+.claude/
+.windsurf/
+skills-lock.json
+
+# docker (deferred/kept separate from migration checkpoint)
+Dockerfile
+.dockerignore
+
