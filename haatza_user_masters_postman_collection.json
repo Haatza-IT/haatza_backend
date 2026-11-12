@@ -1,0 +1,355 @@
+{
+  "info": {
+    "name": "Haatza Backend - User Masters & Registration APIs",
+    "description": "Comprehensive Postman collection for testing Haatza Member, Seller, Employee, and Nest Expert registration APIs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "adminApiKey",
+      "value": "haatza_admin_secret_key_2026",
+      "type": "string"
+    },
+    {
+      "key": "registeredUserId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Haatza Members",
+      "item": [
+        {
+          "name": "Register Member - Success (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"User ID and Referral Code are auto-generated\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data.userId).to.be.a('string');",
+                  "    pm.expect(json.data.referralCode).to.match(/^HZ/);",
+                  "    pm.collectionVariables.set(\"registeredUserId\", json.data.userId);",
+                  "});",
+                  "pm.test(\"Password hash is NOT exposed\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.data.password).to.be.undefined;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Member\",\n  \"email\": \"member_{{$timestamp}}@example.com\",\n  \"phoneNumber\": \"98{{$randomInt}}8\",\n  \"passcode\": \"Test@12345\",\n  \"status\": true,\n  \"referral\": \"\",\n  \"fcmToken\": \"sample-fcm-token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_members"]
+            }
+          }
+        },
+        {
+          "name": "Register Member - Invalid Email Format (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid Email User\",\n  \"email\": \"not-a-valid-email\",\n  \"phoneNumber\": \"9876543210\",\n  \"passcode\": \"Test@12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_members"]
+            }
+          }
+        },
+        {
+          "name": "Register Member - Invalid Phone (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid Phone User\",\n  \"email\": \"test_{{$timestamp}}@example.com\",\n  \"phoneNumber\": \"12345\",\n  \"passcode\": \"Test@12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_members",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_members"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Haatza Sellers",
+      "item": [
+        {
+          "name": "Register Seller - Success (201)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.test(\"Seller ID generated and bank account masked\", function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.eql(true);",
+                  "    pm.expect(json.data.sellerId).to.match(/^HSL-/);",
+                  "    pm.expect(json.data.isSeller).to.eql(true);",
+                  "    pm.expect(json.data.accountNumber).to.include('XXXX');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Seller\",\n  \"email\": \"seller_{{$timestamp}}@example.com\",\n  \"phoneNumber\": \"97{{$randomInt}}5\",\n  \"passcode\": \"Seller@12345\",\n  \"fcmToken\": \"seller-fcm-token\",\n  \"referral\": \"\",\n  \"sellerAddress1\": \"Shop 12, Ground Floor\",\n  \"sellerAddress2\": \"Market Complex\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"country\": \"India\",\n  \"pinCode\": \"400001\",\n  \"sellerPickupAddress\": \"Warehouse 4, Logistics Park, Mumbai, Maharashtra 400001\",\n  \"pickupLocationId\": \"LOC-MUM-01\",\n  \"latitude\": 18.9220,\n  \"longitude\": 72.8346,\n  \"bankName\": \"HDFC Bank\",\n  \"accountHolderName\": \"Test Seller Ventures\",\n  \"accountNumber\": \"50100123456789\",\n  \"ifscCode\": \"HDFC0000060\",\n  \"accountManager\": \"Rajesh Kumar\",\n  \"gstin\": \"27AAPFU0939F1ZV\",\n  \"companyName\": \"Haatza Merchant LLP\",\n  \"panNumber\": \"AAPFU0939F\",\n  \"isGSTRegistered\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_seller",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_seller"]
+            }
+          }
+        },
+        {
+          "name": "Register Seller - Invalid GSTIN Checksum (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid GST Seller\",\n  \"email\": \"seller_badgst_{{$timestamp}}@example.com\",\n  \"phoneNumber\": \"96{{$randomInt}}1\",\n  \"passcode\": \"Seller@12345\",\n  \"isGSTRegistered\": true,\n  \"gstin\": \"27AAPFU0939F1Z0\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_seller",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_seller"]
+            }
+          }
+        },
+        {
+          "name": "Register Seller - Invalid PIN Code (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid Pin Seller\",\n  \"email\": \"seller_badpin_{{$timestamp}}@example.com\",\n  \"phoneNumber\": \"95{{$randomInt}}2\",\n  \"passcode\": \"Seller@12345\",\n  \"pinCode\": \"123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_seller",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_seller"]
+            }
+          }
+        },
+        {
+          "name": "Register Seller - Invalid IFSC Code (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Invalid IFSC Seller\",\n  \"email\": \"seller_badifsc_{{$timestamp}}@example.com\",\n  \"phoneNumber\": \"94{{$randomInt}}3\",\n  \"passcode\": \"Seller@12345\",\n  \"ifscCode\": \"INVALID123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_seller",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_seller"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Haatza Employees",
+      "item": [
+        {
+          "name": "Update Employee Role - Unauthorized (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isHaatzaEmployee\": true,\n  \"userId\": \"{{registeredUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_employee",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_employee"]
+            }
+          }
+        },
+        {
+          "name": "Update Employee Role - Forbidden / Invalid Key (403)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-admin-key",
+                "value": "wrong_key"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isHaatzaEmployee\": true,\n  \"userId\": \"{{registeredUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_employee",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_employee"]
+            }
+          }
+        },
+        {
+          "name": "Update Employee Role - Success (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-admin-key",
+                "value": "{{adminApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isHaatzaEmployee\": true,\n  \"userId\": \"{{registeredUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_employee",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_employee"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Haatza Nest Experts",
+      "item": [
+        {
+          "name": "Update Nest Expert Role - Unauthorized (401)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isNestExpert\": true,\n  \"userId\": \"{{registeredUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_nest_experts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_nest_experts"]
+            }
+          }
+        },
+        {
+          "name": "Update Nest Expert Role - Success (200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-admin-key",
+                "value": "{{adminApiKey}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isNestExpert\": true,\n  \"userId\": \"{{registeredUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/haatza_nest_experts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "haatza_nest_experts"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+
