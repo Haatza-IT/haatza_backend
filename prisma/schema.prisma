@@ -90,5 +90,27 @@ model UserMaster {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // G. Audit Fields
+  createdBy String? @map("created_by")
+  updatedBy String? @map("updated_by")
+
+  // Relations
+  refreshTokens RefreshToken[]
+
   @@map("user_masters")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user UserMaster @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }

@@ -11,9 +11,9 @@ export const memberRegistrationSchema = z
     passcode: passcodeSchema,
     status: z.boolean().optional().default(true),
     referral: z.string().trim().optional(),
+    referralCode: z.string().trim().optional(),
     fcmToken: z.string().trim().optional().nullable(),
   })
   .strict();
 
 export type MemberRegistrationInput = z.infer<typeof memberRegistrationSchema>;
-

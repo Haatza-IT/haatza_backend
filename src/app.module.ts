@@ -6,6 +6,7 @@ import { MembersModule } from './modules/members/members.module';
 import { SellersModule } from './modules/sellers/sellers.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { NestExpertsModule } from './modules/nest-experts/nest-experts.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { NestExpertsModule } from './modules/nest-experts/nest-experts.module';
       },
     ]),
     PrismaModule,
+    AuthModule,
     MembersModule,
     SellersModule,
     EmployeesModule,

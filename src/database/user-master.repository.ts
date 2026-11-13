@@ -92,6 +92,8 @@ export class UserMasterRepository {
     referredByCode?: string | null;
     fcmToken?: string | null;
     status?: boolean;
+    createdBy?: string | null;
+    updatedBy?: string | null;
   }): Promise<UserMaster> {
     return this.prisma.userMaster.create({
       data: {
@@ -108,6 +110,8 @@ export class UserMasterRepository {
         isNestExpert: false,
         isReseller: false,
         isGSTRegistered: false,
+        createdBy: data.createdBy ?? null,
+        updatedBy: data.updatedBy ?? null,
       },
     });
   }
@@ -191,11 +195,15 @@ export class UserMasterRepository {
    */
   async updateEmployeeRole(
     userId: string,
-    isHaatzaEmployee: boolean
+    isHaatzaEmployee: boolean,
+    updatedBy?: string | null,
   ): Promise<UserMaster> {
     return this.prisma.userMaster.update({
       where: { userId },
-      data: { isHaatzaEmployee },
+      data: {
+        isHaatzaEmployee,
+        ...(updatedBy ? { updatedBy } : {}),
+      },
     });
   }
 
@@ -204,11 +212,15 @@ export class UserMasterRepository {
    */
   async updateNestExpertRole(
     userId: string,
-    isNestExpert: boolean
+    isNestExpert: boolean,
+    updatedBy?: string | null,
   ): Promise<UserMaster> {
     return this.prisma.userMaster.update({
       where: { userId },
-      data: { isNestExpert },
+      data: {
+        isNestExpert,
+        ...(updatedBy ? { updatedBy } : {}),
+      },
     });
   }
 }

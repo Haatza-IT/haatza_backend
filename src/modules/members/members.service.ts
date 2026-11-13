@@ -1,9 +1,12 @@
 import { Injectable, ConflictException, Inject } from '@nestjs/common';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
+import type { Response } from 'express';
 import { UserMasterRepository } from '../../database/user-master.repository';
 import { hashPassword } from '../../common/utils/password.util';
-import type { MemberRegistrationDto, MemberResponse, SanitizedMember } from './members.types';
-import { MEMBER_MESSAGES } from './members.types';
+import { AuthService } from '../auth/auth.service';
+import { setRefreshTokenCookie } from '../../common/utils/cookie.util';
+import type { MemberRegistrationDto, MemberResponse } from './members.types';
+import { MEMBER_MESSAGES, serializeRegisteredMember } from './members.types';
 
 @Injectable()
 export class MembersService {
@@ -12,6 +15,8 @@ export class MembersService {
   constructor(
     @Inject(UserMasterRepository)
     private readonly userRepository: UserMasterRepository,
+    @Inject(AuthService)
+    private readonly authService: AuthService,
   ) {}
 
   /**
@@ -35,18 +40,10 @@ export class MembersService {
   }
 
   /**
-   * Sanitizes member data for API responses (stripping password).
+   * Registers a new Haatza Member, issues JWT access token and refresh token session,
+   * sets the secure HttpOnly refresh token cookie, and returns the exact 6-field public data object.
    */
-  private sanitizeMember(user: any): SanitizedMember {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _password, ...safeData } = user;
-    return safeData as SanitizedMember;
-  }
-
-  /**
-   * Registers a new Haatza Member.
-   */
-  async registerMember(dto: MemberRegistrationDto): Promise<MemberResponse> {
+  async registerMember(dto: MemberRegistrationDto, res?: Response): Promise<MemberResponse> {
     // 1. Conflict detection for email or phone
     const existing = await this.userRepository.findByEmailOrPhone(dto.email, dto.phoneNumber);
     if (existing) {
@@ -72,23 +69,41 @@ export class MembersService {
     // 3. Generate unique referral code
     const referralCode = await this.generateUniqueReferralCode();
 
-    // 4. Persist to database
+    // Determine referral code provided
+    const rawReferral = dto.referral || dto.referralCode;
+    const referredByCode = rawReferral && rawReferral.trim().length > 0 ? rawReferral.trim() : null;
+
+    // 4. Persist to database (Audit fields createdBy/updatedBy default to null for public self-registration)
     const createdUser = await this.userRepository.createMember({
       name: dto.name,
       email: dto.email,
       phoneNumber: dto.phoneNumber,
       password: hashedPassword,
       referralCode,
-      referredByCode: dto.referral && dto.referral.trim().length > 0 ? dto.referral.trim() : null,
+      referredByCode,
       fcmToken: dto.fcmToken ?? null,
       status: dto.status ?? true,
+      createdBy: null,
+      updatedBy: null,
     });
 
-    // 5. Return sanitized response
+    // 5. Generate Access Token & Refresh Token session
+    const session = await this.authService.createSession(createdUser.userId, createdUser.email);
+
+    // 6. Deliver tokens securely:
+    // - Refresh token delivered via HttpOnly, Secure, SameSite cookie
+    // - Access token delivered via standard response headers
+    if (res) {
+      setRefreshTokenCookie(res, session.refreshToken);
+      res.setHeader('x-access-token', session.accessToken);
+      res.setHeader('Authorization', `Bearer ${session.accessToken}`);
+    }
+
+    // 7. Return exact 6-field registration response (clean data object, no sensitive or null fields)
     return {
       success: true,
       message: MEMBER_MESSAGES.REGISTERED_SUCCESS,
-      data: this.sanitizeMember(createdUser),
+      data: serializeRegisteredMember(createdUser),
     };
   }
 }
