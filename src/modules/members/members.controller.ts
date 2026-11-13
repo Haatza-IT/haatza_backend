@@ -22,17 +22,25 @@ export class MembersController {
   ) {}
 
   /**
-   * Operation: Register_haatza_members
+   * Operation: register_Haatza_Members
    * Registers a new Haatza member.
    * Supports:
-   * - POST /api/Register_haatza_members
+   * - POST /register_Haatza_Members
+   * - POST /api/register_Haatza_Members
    * - POST /Register_haatza_members
+   * - POST /api/Register_haatza_members
    * - POST /api/haatza_members
    */
-  @Post(['api/Register_haatza_members', 'Register_haatza_members', 'api/haatza_members'])
+  @Post([
+    'register_Haatza_Members',
+    'api/register_Haatza_Members',
+    'Register_haatza_members',
+    'api/Register_haatza_members',
+    'api/haatza_members',
+  ])
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ZodValidationPipe(memberRegistrationSchema))
-  async Register_haatza_members(
+  async register_Haatza_Members(
     @Body() dto: MemberRegistrationDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<MemberResponse> {
