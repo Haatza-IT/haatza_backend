@@ -40,8 +40,9 @@ export class ProductsController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UsePipes(new ZodValidationPipe(createProductSchema))
-  async createProduct(@Body() dto: CreateProductDto): Promise<ProductResponse> {
+  async createProduct(
+    @Body(new ZodValidationPipe(createProductSchema)) dto: CreateProductDto,
+  ): Promise<ProductResponse> {
     return this.productsService.createProduct(dto);
   }
 
@@ -49,8 +50,9 @@ export class ProductsController {
    * Lists products with query parameters, search, filtering, and pagination.
    */
   @Get()
-  @UsePipes(new ZodValidationPipe(productQuerySchema))
-  async listProducts(@Query() query: ProductQueryDto): Promise<ProductListResponse> {
+  async listProducts(
+    @Query(new ZodValidationPipe(productQuerySchema)) query: ProductQueryDto,
+  ): Promise<ProductListResponse> {
     return this.productsService.listProducts(query);
   }
 
@@ -66,10 +68,9 @@ export class ProductsController {
    * Updates an existing product completely.
    */
   @Put(':id')
-  @UsePipes(new ZodValidationPipe(updateProductSchema))
   async updateProduct(
     @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
+    @Body(new ZodValidationPipe(updateProductSchema)) dto: UpdateProductDto,
   ): Promise<ProductResponse> {
     return this.productsService.updateProduct(id, dto);
   }
@@ -78,10 +79,9 @@ export class ProductsController {
    * Updates an existing product partially.
    */
   @Patch(':id')
-  @UsePipes(new ZodValidationPipe(updateProductSchema))
   async patchProduct(
     @Param('id') id: string,
-    @Body() dto: UpdateProductDto,
+    @Body(new ZodValidationPipe(updateProductSchema)) dto: UpdateProductDto,
   ): Promise<ProductResponse> {
     return this.productsService.updateProduct(id, dto);
   }
