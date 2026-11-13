@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider     = "prisma-client"
   output       = "../src/generated/prisma"
@@ -13,8 +11,6 @@ datasource db {
   provider = "postgresql"
 }
 
-// Add the Category model below
-
 model Category {
   id        String   @id @default(uuid())
   name      String
@@ -24,21 +20,102 @@ model Category {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  products Product[]
+  products                Product[] @relation("CategoryProducts")
+  similarCategoryProducts Product[] @relation("SimilarCategoryProducts")
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  price       Decimal  @db.Decimal(10, 2)
-  image       String?
-  stock       Int      @default(0)
-  isActive    Boolean  @default(true)
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // A. Product and Seller Information (1-18)
+  sellerId                 String?
+  categoryId               String
+  productId                String    @id @default(uuid()) @map("id")
+  productName              String    @map("name")
+  categoryName             String?
+  productCoverImages       Json?
+  sku                      String?
+  shippingWeight           Int?
+  brand                    String?
+  status                   Boolean   @default(true) @map("isActive")
+  productOptions           Json?
+  price                    Int
+  productType              String?
+  discount                 Int?      @default(0)
+  manageVariants           Boolean   @default(false)
+  ribbon                   String?
+  trackInventory           Boolean   @default(true)
+  variantPrice             Json?
+
+  // B. Product Specifications and Images (19-29)
+  productSpecification     Json?
+  influencerBranding       Boolean   @default(false)
+  activeAd                 Boolean   @default(false)
+  subcategoryName          String?
+  subcategoryId            String?
+  haatzaVerified           Boolean   @default(false)
+  promotionalImages        Json?
+  paymentType              String?
+  returnPolicy             Json?
+  deliveryCharges          Boolean   @default(false)
+  sizeChart                String?
+
+  // C. Marketing and Analytics (30-36)
+  priorityScore            Int       @default(0)
+  averageCpc               Int       @default(0)
+  reach                    Int       @default(0)
+  impression               Int       @default(0)
+  clicks                   Int       @default(0)
+  sales                    Int       @default(0)
+  revenue                  Int       @default(0)
+
+  // D. Seller, GST and Business Information (37-48)
+  sellerPincode            String?
+  isGstSeller              Boolean   @default(false)
+  searchKeyword            Json?
+  isSellerEarn             Boolean   @default(false)
+  sellAndEarnCommission    Int       @default(0)
+  isDomestic               Boolean   @default(true)
+  businessState            String?
+  businessStateCode        String?
+  salesTerritoryType       String?
+  businessRegistrationType String?
+  gstNo                    String?
+  panNumber                String?
+
+  // E. Pricing and Payment Information (49-53)
+  codPrice                 Int?
+  upi                      Int?
+  mrp                      Int?
+  onSalePrice              Int?
+  upiPaymentDiscount       Int?
+
+  // F. Campaign, Category and Warehouse Information (54-59)
+  campaignId               String?
+  similarCategoryId        String?
+  productHighlights        Json?
+  isHaatzaLite             Boolean   @default(false)
+  warehouseId              String?
+  warehousePincode         String?
+
+  // Preserved Existing Fields
+  description              String?
+  image                    String?
+  stock                    Int       @default(0)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  // Relationships
+  category                 Category    @relation("CategoryProducts", fields: [categoryId], references: [id])
+  similarCategory          Category?   @relation("SimilarCategoryProducts", fields: [similarCategoryId], references: [id], onDelete: SetNull)
+  seller                   UserMaster? @relation(fields: [sellerId], references: [sellerId], onDelete: SetNull)
+
+  // Indexes for query performance
+  @@index([sellerId])
+  @@index([categoryId])
+  @@index([subcategoryId])
+  @@index([campaignId])
+  @@index([warehouseId])
+  @@index([sku])
+  @@index([status])
 }
 
 model UserMaster {
@@ -96,6 +173,7 @@ model UserMaster {
 
   // Relations
   refreshTokens RefreshToken[]
+  products      Product[]
 
   @@map("user_masters")
 }
@@ -113,4 +191,23 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model Dashboard {
+  Widget_id     String   @id @unique
+  Widget_name   String
+  Redirected_to String?
+  Placement     String?
+  Sequence      Int?
+  Territory     String?
+  Items         String[] @default([])
+  Product_Id    String?
+  Category_Id   String?
+
+  @@index([Placement])
+  @@index([Territory])
+  @@index([Sequence])
+  @@index([Product_Id])
+  @@index([Category_Id])
+  @@map("dashboard")
 }

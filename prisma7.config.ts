@@ -3,12 +3,22 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+let dbUrl = process.env["DATABASE_URL"];
+if (dbUrl && dbUrl.includes("neon.tech")) {
+  try {
+    const parsed = new URL(dbUrl);
+    parsed.searchParams.delete("channel_binding");
+    parsed.hostname = parsed.hostname.replace("-pooler", "");
+    dbUrl = parsed.toString();
+  } catch {}
+}
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: dbUrl,
   },
 });

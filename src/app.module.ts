@@ -7,6 +7,8 @@ import { SellersModule } from './modules/sellers/sellers.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { NestExpertsModule } from './modules/nest-experts/nest-experts.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { ProductsModule } from './modules/products/products.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -25,6 +27,8 @@ import { AuthModule } from './modules/auth/auth.module';
     SellersModule,
     EmployeesModule,
     NestExpertsModule,
+    ProductsModule,
+    DashboardModule,
   ],
   providers: [
     {
