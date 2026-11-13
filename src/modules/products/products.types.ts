@@ -3,10 +3,12 @@ import {
   createProductSchema,
   updateProductSchema,
   productQuerySchema,
+  mediaItemSchema,
   promotionalImageItemSchema,
   variantPriceItemSchema,
 } from './products.schema';
 
+export type MediaItem = z.infer<typeof mediaItemSchema>;
 export type PromotionalImageItem = z.infer<typeof promotionalImageItemSchema>;
 export type VariantPriceItem = z.infer<typeof variantPriceItemSchema>;
 export type CreateProductDto = z.infer<typeof createProductSchema>;
@@ -37,7 +39,9 @@ export interface SerializedProduct {
   productName: string;
   name: string; // Legacy alias matching productName
   categoryName: string | null;
-  productCoverImages: string[] | any;
+  productCoverImage: string | null;
+  productCoverImages: string[] | any; // Legacy alias returning [productCoverImage]
+  productImages: MediaItem[] | any;
   sku: string | null;
   shippingWeight: number | null;
   brand: string | null;
@@ -90,7 +94,7 @@ export interface SerializedProduct {
 
   // E. Pricing and Payment Information (49-53)
   codPrice: number | null;
-  upi: number | null;
+  upi: string | null;
   mrp: number | null;
   onSalePrice: number | null;
   upiPaymentDiscount: number | null;

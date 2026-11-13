@@ -3,12 +3,16 @@ import { pinCodeSchema } from '../../common/validations/common.validation';
 import { gstinSchema, panSchema } from '../../common/validations/tax.validation';
 
 /**
- * Promotional gallery item structure:
- * [ { "url": "https://example.com/promo1.jpg" } ]
+ * Media item structure for product_images and promotional_images:
+ * [ { "Image": "https://example.com/item.jpg", "Type": "image" | "video" } ]
+ * Allows both images and videos.
  */
-export const promotionalImageItemSchema = z.object({
-  url: z.string().trim().url({ message: 'Each promotional image must be a valid URL' }),
+export const mediaItemSchema = z.object({
+  Image: z.string().trim().url({ message: 'Media URL must be a valid URL' }),
+  Type: z.enum(['image', 'video', 'IMAGE', 'VIDEO']).transform((val) => val.toLowerCase() as 'image' | 'video'),
 });
+
+export const promotionalImageItemSchema = mediaItemSchema;
 
 /**
  * Product variant price structure:
@@ -33,7 +37,12 @@ export const createProductSchema = z.object({
   // Also accept legacy "name" as fallback for productName
   name: z.string().trim().optional(),
   categoryName: z.string().trim().optional().nullable(),
-  productCoverImages: z.array(z.string().trim().url({ message: 'Each cover image must be a valid URL' })).optional().nullable(),
+  productCoverImage: z.string().trim().url({ message: 'Cover image must be a valid URL' }).optional().nullable(),
+  productCoverImages: z.union([
+    z.string().trim().url({ message: 'Cover image must be a valid URL' }),
+    z.array(z.string().trim().url({ message: 'Each cover image must be a valid URL' })),
+  ]).optional().nullable(),
+  productImages: z.array(mediaItemSchema).optional().nullable(),
   sku: z.string().trim().max(100).optional().nullable(),
   shippingWeight: z.number().int({ message: 'Shipping weight must be an integer (grams)' }).nonnegative({ message: 'Shipping weight cannot be negative' }).optional().nullable(),
   brand: z.string().trim().max(100).optional().nullable(),
@@ -87,7 +96,7 @@ export const createProductSchema = z.object({
 
   // E. Pricing and Payment Information (49-53)
   codPrice: z.number().int().nonnegative().optional().nullable(),
-  upi: z.number().int().nonnegative().optional().nullable(),
+  upi: z.union([z.string().trim(), z.number().transform(String)]).optional().nullable(),
   mrp: z.number().int().nonnegative().optional().nullable(),
   onSalePrice: z.number().int().nonnegative().optional().nullable(),
   upiPaymentDiscount: z.number().int().nonnegative().optional().nullable(),
@@ -133,7 +142,12 @@ export const updateProductSchema = z.object({
   productName: z.string().trim().min(1).optional(),
   name: z.string().trim().min(1).optional(),
   categoryName: z.string().trim().optional().nullable(),
-  productCoverImages: z.array(z.string().trim().url()).optional().nullable(),
+  productCoverImage: z.string().trim().url().optional().nullable(),
+  productCoverImages: z.union([
+    z.string().trim().url(),
+    z.array(z.string().trim().url()),
+  ]).optional().nullable(),
+  productImages: z.array(mediaItemSchema).optional().nullable(),
   sku: z.string().trim().max(100).optional().nullable(),
   shippingWeight: z.number().int().nonnegative().optional().nullable(),
   brand: z.string().trim().max(100).optional().nullable(),
@@ -186,7 +200,7 @@ export const updateProductSchema = z.object({
 
   // E. Pricing and Payment Information (49-53)
   codPrice: z.number().int().nonnegative().optional().nullable(),
-  upi: z.number().int().nonnegative().optional().nullable(),
+  upi: z.union([z.string().trim(), z.number().transform(String)]).optional().nullable(),
   mrp: z.number().int().nonnegative().optional().nullable(),
   onSalePrice: z.number().int().nonnegative().optional().nullable(),
   upiPaymentDiscount: z.number().int().nonnegative().optional().nullable(),

@@ -31,7 +31,9 @@ export class ProductsService {
       productName: product.productName,
       name: product.productName, // Legacy alias
       categoryName: product.categoryName ?? (product.category?.name ?? null),
-      productCoverImages: product.productCoverImages ?? [],
+      productCoverImage: product.productCoverImage ?? null,
+      productCoverImages: product.productCoverImage ? [product.productCoverImage] : [],
+      productImages: product.productImages ?? [],
       sku: product.sku ?? null,
       shippingWeight: product.shippingWeight ?? null,
       brand: product.brand ?? null,
@@ -160,6 +162,12 @@ export class ProductsService {
     // 4. Populate categoryName if missing
     const resolvedCategoryName = dto.categoryName || category.name;
 
+    // Resolve single cover image (from productCoverImage or first element of productCoverImages)
+    const resolvedCoverImage =
+      dto.productCoverImage ??
+      (Array.isArray(dto.productCoverImages) ? dto.productCoverImages[0] : dto.productCoverImages) ??
+      null;
+
     // 5. Construct database record
     const created = await this.prisma.product.create({
       data: {
@@ -169,7 +177,8 @@ export class ProductsService {
         ...(dto.productId ? { productId: dto.productId } : {}),
         productName: dto.productName,
         categoryName: resolvedCategoryName,
-        productCoverImages: dto.productCoverImages as any,
+        productCoverImage: resolvedCoverImage,
+        productImages: (dto.productImages || []) as any,
         sku: dto.sku || null,
         shippingWeight: dto.shippingWeight !== undefined ? dto.shippingWeight : null,
         brand: dto.brand || null,
@@ -221,7 +230,7 @@ export class ProductsService {
 
         // E. Pricing and Payment Information
         codPrice: dto.codPrice !== undefined ? dto.codPrice : null,
-        upi: dto.upi !== undefined ? dto.upi : null,
+        upi: dto.upi !== undefined && dto.upi !== null ? String(dto.upi) : null,
         mrp: dto.mrp !== undefined ? dto.mrp : null,
         onSalePrice: dto.onSalePrice !== undefined ? dto.onSalePrice : null,
         upiPaymentDiscount: dto.upiPaymentDiscount !== undefined ? dto.upiPaymentDiscount : null,
@@ -339,7 +348,15 @@ export class ProductsService {
         ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
         ...(dto.productName !== undefined ? { productName: dto.productName } : {}),
         ...(dto.categoryName !== undefined ? { categoryName: dto.categoryName } : {}),
-        ...(dto.productCoverImages !== undefined ? { productCoverImages: dto.productCoverImages as any } : {}),
+        ...(dto.productCoverImage !== undefined ? { productCoverImage: dto.productCoverImage } : {}),
+        ...(dto.productCoverImages !== undefined
+          ? {
+              productCoverImage: Array.isArray(dto.productCoverImages)
+                ? dto.productCoverImages[0]
+                : dto.productCoverImages,
+            }
+          : {}),
+        ...(dto.productImages !== undefined ? { productImages: dto.productImages as any } : {}),
         ...(dto.sku !== undefined ? { sku: dto.sku } : {}),
         ...(dto.shippingWeight !== undefined ? { shippingWeight: dto.shippingWeight } : {}),
         ...(dto.brand !== undefined ? { brand: dto.brand } : {}),
@@ -387,7 +404,7 @@ export class ProductsService {
         ...(dto.panNumber !== undefined ? { panNumber: dto.panNumber } : {}),
 
         ...(dto.codPrice !== undefined ? { codPrice: dto.codPrice } : {}),
-        ...(dto.upi !== undefined ? { upi: dto.upi } : {}),
+        ...(dto.upi !== undefined ? { upi: dto.upi !== null ? String(dto.upi) : null } : {}),
         ...(dto.mrp !== undefined ? { mrp: dto.mrp } : {}),
         ...(dto.onSalePrice !== undefined ? { onSalePrice: dto.onSalePrice } : {}),
         ...(dto.upiPaymentDiscount !== undefined ? { upiPaymentDiscount: dto.upiPaymentDiscount } : {}),
