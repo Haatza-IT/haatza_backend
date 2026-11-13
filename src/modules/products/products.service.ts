@@ -35,14 +35,14 @@ export class ProductsService {
       productCoverImages: product.productCoverImage ? [product.productCoverImage] : [],
       productImages: product.productImages ?? [],
       sku: product.sku ?? null,
-      shippingWeight: product.shippingWeight ?? null,
+      shippingWeight: product.shippingWeight !== null && product.shippingWeight !== undefined ? Number(product.shippingWeight) : null,
       brand: product.brand ?? null,
       status: product.status,
       isActive: product.status, // Legacy alias
       productOptions: product.productOptions ?? null,
-      price: product.price,
+      price: product.price !== null && product.price !== undefined ? Number(product.price) : 0,
       productType: product.productType ?? null,
-      discount: product.discount ?? 0,
+      discount: product.discount !== null && product.discount !== undefined ? Number(product.discount) : 0,
       manageVariants: product.manageVariants ?? false,
       ribbon: product.ribbon ?? null,
       trackInventory: product.trackInventory ?? true,
@@ -63,12 +63,12 @@ export class ProductsService {
 
       // C. Marketing and Analytics (30-36)
       priorityScore: product.priorityScore ?? 0,
-      averageCpc: product.averageCpc ?? 0,
-      reach: product.reach ?? 0,
-      impression: product.impression ?? 0,
-      clicks: product.clicks ?? 0,
-      sales: product.sales ?? 0,
-      revenue: product.revenue ?? 0,
+      averageCpc: product.averageCpc !== null && product.averageCpc !== undefined ? Number(product.averageCpc) : 0,
+      reach: product.reach !== null && product.reach !== undefined ? Number(product.reach) : 0,
+      impression: product.impression !== null && product.impression !== undefined ? Number(product.impression) : 0,
+      clicks: product.clicks !== null && product.clicks !== undefined ? Number(product.clicks) : 0,
+      sales: product.sales !== null && product.sales !== undefined ? Number(product.sales) : 0,
+      revenue: product.revenue !== null && product.revenue !== undefined ? Number(product.revenue) : 0,
 
       // D. Seller, GST and Business Information (37-48)
       sellerPincode: product.sellerPincode ?? null,
@@ -85,11 +85,11 @@ export class ProductsService {
       panNumber: product.panNumber ?? null,
 
       // E. Pricing and Payment Information (49-53)
-      codPrice: product.codPrice ?? null,
+      codPrice: product.codPrice !== null && product.codPrice !== undefined ? Number(product.codPrice) : null,
       upi: product.upi ?? null,
-      mrp: product.mrp ?? null,
-      onSalePrice: product.onSalePrice ?? null,
-      upiPaymentDiscount: product.upiPaymentDiscount ?? null,
+      mrp: product.mrp !== null && product.mrp !== undefined ? Number(product.mrp) : null,
+      onSalePrice: product.onSalePrice !== null && product.onSalePrice !== undefined ? Number(product.onSalePrice) : null,
+      upiPaymentDiscount: product.upiPaymentDiscount !== null && product.upiPaymentDiscount !== undefined ? Number(product.upiPaymentDiscount) : null,
 
       // F. Campaign, Category and Warehouse Information (54-59)
       campaignId: product.campaignId ?? null,
