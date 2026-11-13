@@ -172,6 +172,10 @@ model RefreshToken {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  // Audit Fields
+  createdBy String?  @map("created_by")
+  updatedBy String?  @map("updated_by")
+
   user UserMaster @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@index([userId])

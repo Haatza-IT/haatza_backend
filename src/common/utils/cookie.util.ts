@@ -61,7 +61,7 @@ export function setRefreshTokenCookie(res: Response, token: string): void {
     secure,
     sameSite,
     path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    maxAge: 2 * 60 * 60 * 1000, // 2 hours in milliseconds (7,200,000 ms)
   });
 }
 

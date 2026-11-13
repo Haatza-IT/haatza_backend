@@ -1,12 +1,12 @@
 import { Injectable, UnauthorizedException, Inject } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
-import type { JwtPayload, TokenSession } from './auth.types';
+import type { JwtPayload, TokenSession, ClientAuditContext } from './auth.types';
 
 @Injectable()
 export class AuthService {
   private readonly ACCESS_TOKEN_TTL_SECONDS = 900; // 15 minutes
-  private readonly REFRESH_TOKEN_TTL_DAYS = 7; // 7 days
+  private readonly REFRESH_TOKEN_TTL_SECONDS = 7200; // 2 hours (120 minutes)
 
   constructor(
     @Inject(PrismaService)
@@ -156,20 +156,41 @@ export class AuthService {
   }
 
   /**
-   * Creates an active token session (Access Token + Hashed Refresh Token in DB).
+   * Formats client audit string recording identity, IP, location, and device agent.
    */
-  async createSession(userId: string, email: string): Promise<TokenSession> {
+  private formatAuditInfo(identity: string, context?: ClientAuditContext): string {
+    const parts = [identity];
+    if (context?.ip && context.ip !== 'unknown') parts.push(`IP: ${context.ip}`);
+    if (context?.location) parts.push(`Loc: ${context.location}`);
+    if (context?.userAgent && context.userAgent !== 'unknown') {
+      parts.push(`Device: ${context.userAgent.slice(0, 80)}`);
+    }
+    return parts.join(' | ');
+  }
+
+  /**
+   * Creates an active token session (Access Token + Hashed Refresh Token in DB).
+   * Valid for 2 hours (7200 seconds) with location and client audit tracking.
+   */
+  async createSession(
+    userId: string,
+    email: string,
+    context?: ClientAuditContext,
+  ): Promise<TokenSession> {
     const rawRefreshToken = this.generateSecureRandomToken();
     const tokenHash = this.hashToken(rawRefreshToken);
-    const expiresAt = new Date(Date.now() + this.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + this.REFRESH_TOKEN_TTL_SECONDS * 1000);
+    const auditInfo = this.formatAuditInfo(email, context);
 
-    // Persist hashed token in PostgreSQL
+    // Persist hashed token in PostgreSQL with audit columns
     await this.prisma.refreshToken.create({
       data: {
         userId,
         tokenHash,
         expiresAt,
         isRevoked: false,
+        createdBy: auditInfo,
+        updatedBy: auditInfo,
       },
     });
 
@@ -179,13 +200,18 @@ export class AuthService {
       accessToken,
       refreshToken: rawRefreshToken,
       expiresIn: this.ACCESS_TOKEN_TTL_SECONDS,
+      refreshTokenExpiresIn: this.REFRESH_TOKEN_TTL_SECONDS,
     };
   }
 
   /**
    * Refreshes a session by rotating the refresh token and generating a fresh access token.
+   * Enforces 2-hour session expiration and records refreshing location/device.
    */
-  async refreshSession(rawRefreshToken: string): Promise<TokenSession> {
+  async refreshSession(
+    rawRefreshToken: string,
+    context?: ClientAuditContext,
+  ): Promise<TokenSession> {
     if (!rawRefreshToken || typeof rawRefreshToken !== 'string' || rawRefreshToken.trim().length === 0) {
       throw new UnauthorizedException({
         success: false,
@@ -219,9 +245,13 @@ export class AuthService {
 
     // Token reuse detection: if an already-revoked token is used, invalidate all sessions for security
     if (tokenRecord.isRevoked) {
+      const breachAudit = `Breach detected: Reuse of revoked token | ${this.formatAuditInfo(tokenRecord.user?.email || tokenRecord.userId, context)}`;
       await this.prisma.refreshToken.updateMany({
         where: { userId: tokenRecord.userId },
-        data: { isRevoked: true },
+        data: {
+          isRevoked: true,
+          updatedBy: breachAudit,
+        },
       });
       throw new UnauthorizedException({
         success: false,
@@ -230,11 +260,11 @@ export class AuthService {
       });
     }
 
-    // Check expiration
+    // Check expiration (Strict 2-hour timeout)
     if (new Date() > tokenRecord.expiresAt) {
       throw new UnauthorizedException({
         success: false,
-        message: 'Refresh token has expired',
+        message: 'Refresh token has expired (2-hour session limit). Please log in again.',
         errors: [],
       });
     }
@@ -248,16 +278,21 @@ export class AuthService {
       });
     }
 
+    const refreshAuditInfo = this.formatAuditInfo(tokenRecord.user.email, context);
+
     // 1. Invalidate old token (Rotation)
     await this.prisma.refreshToken.update({
       where: { id: tokenRecord.id },
-      data: { isRevoked: true },
+      data: {
+        isRevoked: true,
+        updatedBy: `Rotated | ${refreshAuditInfo}`,
+      },
     });
 
-    // 2. Generate new token pair
+    // 2. Generate new token pair with fresh 2-hour expiration
     const newRawRefreshToken = this.generateSecureRandomToken();
     const newTokenHash = this.hashToken(newRawRefreshToken);
-    const newExpiresAt = new Date(Date.now() + this.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
+    const newExpiresAt = new Date(Date.now() + this.REFRESH_TOKEN_TTL_SECONDS * 1000);
 
     await this.prisma.refreshToken.create({
       data: {
@@ -265,6 +300,8 @@ export class AuthService {
         tokenHash: newTokenHash,
         expiresAt: newExpiresAt,
         isRevoked: false,
+        createdBy: `Rotated from ${tokenRecord.id.slice(0, 8)} | ${refreshAuditInfo}`,
+        updatedBy: refreshAuditInfo,
       },
     });
 
@@ -274,21 +311,28 @@ export class AuthService {
       accessToken: newAccessToken,
       refreshToken: newRawRefreshToken,
       expiresIn: this.ACCESS_TOKEN_TTL_SECONDS,
+      refreshTokenExpiresIn: this.REFRESH_TOKEN_TTL_SECONDS,
     };
   }
 
   /**
    * Revokes a refresh token (used by logout or explicit revocation).
    */
-  async revokeToken(rawRefreshToken: string): Promise<boolean> {
+  async revokeToken(rawRefreshToken: string, context?: ClientAuditContext): Promise<boolean> {
     if (!rawRefreshToken || typeof rawRefreshToken !== 'string') {
       return false;
     }
     const tokenHash = this.hashToken(rawRefreshToken.trim());
     try {
+      const audit = context
+        ? `Revoked | ${this.formatAuditInfo('Client', context)}`
+        : 'Revoked by user logout';
       await this.prisma.refreshToken.update({
         where: { tokenHash },
-        data: { isRevoked: true },
+        data: {
+          isRevoked: true,
+          updatedBy: audit,
+        },
       });
       return true;
     } catch {
