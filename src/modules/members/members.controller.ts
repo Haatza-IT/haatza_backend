@@ -14,7 +14,7 @@ import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { memberRegistrationSchema } from './members.schema';
 import type { MemberRegistrationDto, MemberResponse } from './members.types';
 
-@Controller('api/haatza_members')
+@Controller()
 export class MembersController {
   constructor(
     @Inject(MembersService)
@@ -23,9 +23,13 @@ export class MembersController {
 
   /**
    * Operation: Register_haatza_members
-   * Registers a new Haatza member and returns the exact 6-field data payload.
+   * Registers a new Haatza member.
+   * Supports:
+   * - POST /api/Register_haatza_members
+   * - POST /Register_haatza_members
+   * - POST /api/haatza_members
    */
-  @Post()
+  @Post(['api/Register_haatza_members', 'Register_haatza_members', 'api/haatza_members'])
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ZodValidationPipe(memberRegistrationSchema))
   async Register_haatza_members(
