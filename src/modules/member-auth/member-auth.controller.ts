@@ -96,17 +96,14 @@ export class MemberAuthController {
 
   /**
    * 3. POST /login_phonenumber
-   * Authenticates member with phone number + password (or generates & dispatches OTP via Fast2SMS).
+   * Validates phone number, checks registered user, generates & dispatches OTP via Fast2SMS.
    */
   @Post('login_phonenumber')
   @HttpCode(HttpStatus.OK)
   async loginPhoneNumber(
     @Body(new ZodValidationPipe(loginPhoneNumberSchema)) dto: LoginPhoneNumberDto,
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<LoginResponse | OtpSendResponse> {
-    const auditContext = this.extractAuditContext(req);
-    return this.memberAuthService.loginPhoneNumber(dto, auditContext, res);
+  ): Promise<OtpSendResponse> {
+    return this.memberAuthService.loginPhoneNumber(dto);
   }
 
   /**

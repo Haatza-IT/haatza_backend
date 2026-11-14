@@ -30,8 +30,6 @@ export type LoginEmailDto = z.infer<typeof loginEmailSchema>;
 export const loginPhoneNumberSchema = z.object({
   phoneNumber: z.string().trim().optional(),
   phone: z.string().trim().optional(),
-  password: passcodeSchema.optional(),
-  passcode: passcodeSchema.optional(),
 }).refine((data) => !!(data.phoneNumber || data.phone), {
   message: 'phoneNumber is required',
 }).transform((data) => {
@@ -46,10 +44,7 @@ export const loginPhoneNumberSchema = z.object({
       },
     ]);
   }
-  return {
-    phoneNumber: cleaned,
-    password: data.password || data.passcode,
-  };
+  return { phoneNumber: cleaned };
 });
 
 export type LoginPhoneNumberDto = z.infer<typeof loginPhoneNumberSchema>;
@@ -57,7 +52,7 @@ export type LoginPhoneNumberDto = z.infer<typeof loginPhoneNumberSchema>;
 export const generateOtpSchema = z.object({
   phoneNumber: z.string().trim().optional(),
   phone: z.string().trim().optional(),
-  purpose: z.enum(['login', 'forgot_password', 'verification']).optional().default('login'),
+  purpose: z.string().trim().optional().default('login'),
 }).refine((data) => !!(data.phoneNumber || data.phone), {
   message: 'phoneNumber is required',
 }).transform((data) => {
@@ -72,7 +67,7 @@ export const generateOtpSchema = z.object({
       },
     ]);
   }
-  return { phoneNumber: cleaned, purpose: data.purpose };
+  return { phoneNumber: cleaned, purpose: data.purpose || 'login' };
 });
 
 export type GenerateOtpDto = z.infer<typeof generateOtpSchema>;
@@ -81,7 +76,7 @@ export const verifyOtpSchema = z.object({
   phoneNumber: z.string().trim().optional(),
   phone: z.string().trim().optional(),
   otp: z.string().trim().regex(/^\d{6}$/, { message: 'OTP must be exactly 6 numeric digits' }),
-  purpose: z.enum(['login', 'forgot_password', 'verification']).optional().default('login'),
+  purpose: z.string().trim().optional().default('login'),
 }).refine((data) => !!(data.phoneNumber || data.phone), {
   message: 'phoneNumber is required',
 }).transform((data) => {
@@ -96,7 +91,7 @@ export const verifyOtpSchema = z.object({
       },
     ]);
   }
-  return { phoneNumber: cleaned, otp: data.otp, purpose: data.purpose };
+  return { phoneNumber: cleaned, otp: data.otp, purpose: data.purpose || 'login' };
 });
 
 export type VerifyOtpDto = z.infer<typeof verifyOtpSchema>;
@@ -104,7 +99,7 @@ export type VerifyOtpDto = z.infer<typeof verifyOtpSchema>;
 export const resendOtpSchema = z.object({
   phoneNumber: z.string().trim().optional(),
   phone: z.string().trim().optional(),
-  purpose: z.enum(['login', 'forgot_password', 'verification']).optional().default('login'),
+  purpose: z.string().trim().optional().default('login'),
 }).refine((data) => !!(data.phoneNumber || data.phone), {
   message: 'phoneNumber is required',
 }).transform((data) => {
@@ -119,7 +114,7 @@ export const resendOtpSchema = z.object({
       },
     ]);
   }
-  return { phoneNumber: cleaned, purpose: data.purpose };
+  return { phoneNumber: cleaned, purpose: data.purpose || 'login' };
 });
 
 export type ResendOtpDto = z.infer<typeof resendOtpSchema>;

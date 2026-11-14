@@ -199,11 +199,7 @@ export class MemberAuthService {
   // =========================================================================
   // 3. Login with Phone Number (POST /login_phonenumber)
   // =========================================================================
-  async loginPhoneNumber(
-    dto: LoginPhoneNumberDto,
-    context?: ClientAuditContext,
-    res?: Response,
-  ): Promise<LoginResponse | OtpSendResponse> {
+  async loginPhoneNumber(dto: LoginPhoneNumberDto): Promise<OtpSendResponse> {
     const user = await this.userMasterRepo.findUserForAuth(null, dto.phoneNumber);
 
     if (!user) {
@@ -222,41 +218,7 @@ export class MemberAuthService {
       });
     }
 
-    // Direct password authentication if password/passcode is provided
-    if (dto.password) {
-      const isMatch = await verifyPassword(dto.password, user.password);
-      if (!isMatch) {
-        throw new UnauthorizedException({
-          success: false,
-          message: 'Invalid phone number or password',
-          errors: [],
-        });
-      }
-
-      const session = await this.authService.createSession(user.userId, user.email, context);
-      this.setRefreshCookie(res, session.refreshToken);
-      if (res && typeof res.setHeader === 'function') {
-        res.setHeader('x-access-token', session.accessToken);
-        res.setHeader('Authorization', `Bearer ${session.accessToken}`);
-      }
-
-      return {
-        success: true,
-        message: 'Login successful',
-        data: {
-          user: {
-            userId: user.userId,
-            name: user.name,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            referralCode: user.referralCode,
-            status: user.status,
-          },
-        },
-      };
-    }
-
-    // Otherwise dispatch OTP for phone login
+    // Dispatches OTP via Fast2SMS
     return this.generateAndSendOtpInternal(dto.phoneNumber, 'login');
   }
 
@@ -331,10 +293,6 @@ export class MemberAuthService {
     return {
       success: true,
       message: 'OTP Sent Successfully',
-      data: {
-        phoneNumber,
-        expiresInSeconds: this.OTP_TTL_MINUTES * 60,
-      },
     };
   }
 
@@ -346,15 +304,13 @@ export class MemberAuthService {
     context?: ClientAuditContext,
     res?: Response,
   ): Promise<VerifyOtpResponse> {
-    const purpose = dto.purpose || 'login';
-
     // Stage 1 Parallelization:
     // Fetch latest OTP record and lookup user simultaneously in a single network round-trip
     const [otpRecord, user] = await Promise.all([
       this.prisma.otpStorage.findFirst({
         where: {
           phoneNumber: dto.phoneNumber,
-          purpose,
+          ...(dto.purpose ? { purpose: dto.purpose } : {}),
           isVerified: false,
         },
         orderBy: { createdAt: 'desc' },
@@ -404,8 +360,10 @@ export class MemberAuthService {
       };
     }
 
+    const effectivePurpose = dto.purpose || otpRecord.purpose || 'login';
+
     // Validate account status before creating session
-    if (purpose === 'login' && user && !user.status) {
+    if (effectivePurpose === 'login' && user && !user.status) {
       throw new UnauthorizedException({
         success: false,
         message: 'Account is inactive or disabled. Please contact Haatza support.',
@@ -415,7 +373,7 @@ export class MemberAuthService {
 
     // Stage 2 Parallelization:
     // Mark OTP as verified and persist auth session token in parallel
-    const sessionPromise = (purpose === 'login' && user)
+    const sessionPromise = user
       ? this.authService.createSession(user.userId, user.email, context)
       : Promise.resolve(null);
 
@@ -430,54 +388,32 @@ export class MemberAuthService {
       sessionPromise,
     ]);
 
-    // If purpose is login, deliver tokens
-    if (purpose === 'login') {
-      if (user && session) {
-        this.setRefreshCookie(res, session.refreshToken);
-        if (res && typeof res.setHeader === 'function') {
-          res.setHeader('x-access-token', session.accessToken);
-          res.setHeader('Authorization', `Bearer ${session.accessToken}`);
-        }
-
-        return {
-          success: true,
-          message: 'OTP verified successfully',
-          data: {
-            user: {
-              userId: user.userId,
-              name: user.name,
-              email: user.email,
-              phoneNumber: user.phoneNumber,
-              referralCode: user.referralCode,
-              status: user.status,
-            },
-          },
-        };
+    if (user && session) {
+      this.setRefreshCookie(res, session.refreshToken);
+      if (res && typeof res.setHeader === 'function') {
+        res.setHeader('x-access-token', session.accessToken);
+        res.setHeader('Authorization', `Bearer ${session.accessToken}`);
       }
 
-      // If user does not exist in user_masters, OTP verified for new onboarding
       return {
         success: true,
         message: 'OTP verified successfully',
-        data: {},
+        data: {
+          user: {
+            userId: user.userId,
+            name: user.name,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            referralCode: user.referralCode,
+            status: user.status,
+          },
+        },
       };
     }
 
-    // Verification or forgot_password purpose
     return {
       success: true,
       message: 'OTP verified successfully',
-      data: {
-        customer: user
-          ? {
-              nickname: this.extractNickname(user.email, user.name),
-              status: user.status,
-              email: user.email,
-              phoneNumber: user.phoneNumber,
-              referralCode: user.referralCode,
-            }
-          : undefined,
-      },
     };
   }
 
