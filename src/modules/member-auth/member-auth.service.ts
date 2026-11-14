@@ -115,31 +115,17 @@ export class MemberAuthService {
       return cached.data;
     }
 
-    // Fast single-query lookup with targeted 6-column projection
+    // Fast single-query lookup with targeted primary key projection
     const user = await this.userMasterRepo.findUserForCheck(phoneNumber, email);
 
     const response: CheckUserResponse = !user
       ? {
-          success: true,
-          message: 'User does not exist. Available for new registration.',
-          data: {
-            exists: false,
-            isRegistered: false,
-          },
+          success: false,
+          message: 'User does not exist in system',
         }
       : {
           success: true,
           message: 'User exists in system',
-          data: {
-            exists: true,
-            isRegistered: true,
-            nickname: this.extractNickname(user.email, user.name),
-            name: user.name,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            referralCode: user.referralCode,
-            status: user.status,
-          },
         };
 
     if (this.checkUserCache.size > 1000) {

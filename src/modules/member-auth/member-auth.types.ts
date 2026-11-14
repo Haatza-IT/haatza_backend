@@ -20,7 +20,7 @@ export interface CheckUserData {
 export interface CheckUserResponse {
   success: boolean;
   message: string;
-  data: CheckUserData;
+  data?: CheckUserData;
 }
 
 export interface LoginUserData {

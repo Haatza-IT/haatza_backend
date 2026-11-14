@@ -76,11 +76,6 @@ export class UserMasterRepository {
       where: conditions.length === 1 ? conditions[0] : { OR: conditions },
       select: {
         userId: true,
-        name: true,
-        email: true,
-        phoneNumber: true,
-        referralCode: true,
-        status: true,
       },
     });
   }
