@@ -167,9 +167,34 @@ async function bootstrap() {
     next();
   });
 
-  // 1. Explicit JSON & URL-encoded request body size limit (100KB)
-  // Rejects oversized request bodies with HTTP 413 Payload Too Large
-  app.use(express.json({ limit: '100kb' }));
+  // 1. Robust JSON & URL-encoded request body parsing with trailing-comma fault tolerance
+  app.use(express.text({ type: 'application/json', limit: '100kb' }));
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (typeof req.body === 'string') {
+      const trimmed = req.body.trim();
+      if (!trimmed) {
+        req.body = {};
+        return next();
+      }
+      try {
+        req.body = JSON.parse(trimmed);
+      } catch {
+        try {
+          // Lenient parser: automatically strips accidental trailing commas (e.g. {"key": "val",})
+          let cleaned = trimmed;
+          let prev: string;
+          do {
+            prev = cleaned;
+            cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
+          } while (cleaned !== prev);
+          req.body = JSON.parse(cleaned);
+        } catch (err) {
+          return next(err);
+        }
+      }
+    }
+    next();
+  });
   app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
   // 2. HTTP Security Headers via Helmet
