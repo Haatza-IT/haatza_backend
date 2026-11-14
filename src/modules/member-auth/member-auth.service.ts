@@ -175,6 +175,10 @@ export class MemberAuthService {
 
     const session = await this.authService.createSession(user.userId, user.email, context);
     this.setRefreshCookie(res, session.refreshToken);
+    if (res && typeof res.setHeader === 'function') {
+      res.setHeader('x-access-token', session.accessToken);
+      res.setHeader('Authorization', `Bearer ${session.accessToken}`);
+    }
 
     return {
       success: true,
@@ -188,10 +192,6 @@ export class MemberAuthService {
           referralCode: user.referralCode,
           status: user.status,
         },
-        accessToken: session.accessToken,
-        tokenType: 'Bearer',
-        expiresIn: session.expiresIn,
-        refreshTokenExpiresIn: session.refreshTokenExpiresIn,
       },
     };
   }
@@ -199,7 +199,11 @@ export class MemberAuthService {
   // =========================================================================
   // 3. Login with Phone Number (POST /login_phonenumber)
   // =========================================================================
-  async loginPhoneNumber(dto: LoginPhoneNumberDto): Promise<OtpSendResponse> {
+  async loginPhoneNumber(
+    dto: LoginPhoneNumberDto,
+    context?: ClientAuditContext,
+    res?: Response,
+  ): Promise<LoginResponse | OtpSendResponse> {
     const user = await this.userMasterRepo.findUserForAuth(null, dto.phoneNumber);
 
     if (!user) {
@@ -218,6 +222,41 @@ export class MemberAuthService {
       });
     }
 
+    // Direct password authentication if password/passcode is provided
+    if (dto.password) {
+      const isMatch = await verifyPassword(dto.password, user.password);
+      if (!isMatch) {
+        throw new UnauthorizedException({
+          success: false,
+          message: 'Invalid phone number or password',
+          errors: [],
+        });
+      }
+
+      const session = await this.authService.createSession(user.userId, user.email, context);
+      this.setRefreshCookie(res, session.refreshToken);
+      if (res && typeof res.setHeader === 'function') {
+        res.setHeader('x-access-token', session.accessToken);
+        res.setHeader('Authorization', `Bearer ${session.accessToken}`);
+      }
+
+      return {
+        success: true,
+        message: 'Login successful',
+        data: {
+          user: {
+            userId: user.userId,
+            name: user.name,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            referralCode: user.referralCode,
+            status: user.status,
+          },
+        },
+      };
+    }
+
+    // Otherwise dispatch OTP for phone login
     return this.generateAndSendOtpInternal(dto.phoneNumber, 'login');
   }
 
@@ -395,21 +434,23 @@ export class MemberAuthService {
     if (purpose === 'login') {
       if (user && session) {
         this.setRefreshCookie(res, session.refreshToken);
+        if (res && typeof res.setHeader === 'function') {
+          res.setHeader('x-access-token', session.accessToken);
+          res.setHeader('Authorization', `Bearer ${session.accessToken}`);
+        }
 
         return {
           success: true,
           message: 'OTP verified successfully',
           data: {
-            customer: {
-              nickname: this.extractNickname(user.email, user.name),
-              status: user.status,
+            user: {
+              userId: user.userId,
+              name: user.name,
               email: user.email,
               phoneNumber: user.phoneNumber,
               referralCode: user.referralCode,
+              status: user.status,
             },
-            accessToken: session.accessToken,
-            tokenType: 'Bearer',
-            expiresIn: session.expiresIn,
           },
         };
       }
@@ -418,9 +459,7 @@ export class MemberAuthService {
       return {
         success: true,
         message: 'OTP verified successfully',
-        data: {
-          customer: undefined,
-        },
+        data: {},
       };
     }
 

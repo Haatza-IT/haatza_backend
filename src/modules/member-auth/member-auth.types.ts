@@ -37,9 +37,9 @@ export interface LoginResponse {
   message: string;
   data: {
     user: LoginUserData;
-    accessToken: string;
-    tokenType: string;
-    expiresIn: number;
+    accessToken?: string;
+    tokenType?: string;
+    expiresIn?: number;
     refreshTokenExpiresIn?: number;
   };
 }
@@ -58,6 +58,7 @@ export interface VerifyOtpResponse {
   success: boolean;
   message: string;
   data?: {
+    user?: LoginUserData;
     customer?: CustomerSummary;
     accessToken?: string;
     tokenType?: string;

@@ -91,23 +91,22 @@ export class MemberAuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<LoginResponse> {
     const auditContext = this.extractAuditContext(req);
-    const result = await this.memberAuthService.loginEmail(dto, auditContext, res);
-
-    res.setHeader('x-access-token', result.data.accessToken);
-    res.setHeader('Authorization', `Bearer ${result.data.accessToken}`);
-    return result;
+    return this.memberAuthService.loginEmail(dto, auditContext, res);
   }
 
   /**
    * 3. POST /login_phonenumber
-   * Validates phone number, checks registered user, generates & dispatches OTP via Fast2SMS.
+   * Authenticates member with phone number + password (or generates & dispatches OTP via Fast2SMS).
    */
   @Post('login_phonenumber')
   @HttpCode(HttpStatus.OK)
   async loginPhoneNumber(
     @Body(new ZodValidationPipe(loginPhoneNumberSchema)) dto: LoginPhoneNumberDto,
-  ): Promise<OtpSendResponse> {
-    return this.memberAuthService.loginPhoneNumber(dto);
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<LoginResponse | OtpSendResponse> {
+    const auditContext = this.extractAuditContext(req);
+    return this.memberAuthService.loginPhoneNumber(dto, auditContext, res);
   }
 
   /**
@@ -124,7 +123,7 @@ export class MemberAuthController {
 
   /**
    * 5. POST /verify_otp
-   * Verifies submitted OTP code. If purpose is 'login', creates authenticated session & returns customer summary.
+   * Verifies submitted OTP code. If purpose is 'login', creates authenticated session & returns user details.
    */
   @Post('verify_otp')
   @HttpCode(HttpStatus.OK)
@@ -134,13 +133,7 @@ export class MemberAuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<VerifyOtpResponse> {
     const auditContext = this.extractAuditContext(req);
-    const result = await this.memberAuthService.verifyOtp(dto, auditContext, res);
-
-    if (result.data?.accessToken) {
-      res.setHeader('x-access-token', result.data.accessToken);
-      res.setHeader('Authorization', `Bearer ${result.data.accessToken}`);
-    }
-    return result;
+    return this.memberAuthService.verifyOtp(dto, auditContext, res);
   }
 
   /**

@@ -30,6 +30,8 @@ export type LoginEmailDto = z.infer<typeof loginEmailSchema>;
 export const loginPhoneNumberSchema = z.object({
   phoneNumber: z.string().trim().optional(),
   phone: z.string().trim().optional(),
+  password: passcodeSchema.optional(),
+  passcode: passcodeSchema.optional(),
 }).refine((data) => !!(data.phoneNumber || data.phone), {
   message: 'phoneNumber is required',
 }).transform((data) => {
@@ -44,7 +46,10 @@ export const loginPhoneNumberSchema = z.object({
       },
     ]);
   }
-  return { phoneNumber: cleaned };
+  return {
+    phoneNumber: cleaned,
+    password: data.password || data.passcode,
+  };
 });
 
 export type LoginPhoneNumberDto = z.infer<typeof loginPhoneNumberSchema>;
