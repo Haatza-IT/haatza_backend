@@ -34,6 +34,7 @@ import {
 import type {
   CheckUserResponse,
   LoginResponse,
+  LoginPhoneNumberResponse,
   OtpSendResponse,
   VerifyOtpResponse,
   ResetPasswordResponse,
@@ -96,13 +97,14 @@ export class MemberAuthController {
 
   /**
    * 3. POST /login_phonenumber
-   * Validates phone number, checks registered user, generates & dispatches OTP via Fast2SMS.
+   * Step 1: Validates phone number and checks registered user existence in user_masters.
+   * Does NOT generate or send OTP. Returns confirmation to proceed with OTP generation.
    */
   @Post('login_phonenumber')
   @HttpCode(HttpStatus.OK)
   async loginPhoneNumber(
     @Body(new ZodValidationPipe(loginPhoneNumberSchema)) dto: LoginPhoneNumberDto,
-  ): Promise<OtpSendResponse> {
+  ): Promise<LoginPhoneNumberResponse> {
     return this.memberAuthService.loginPhoneNumber(dto);
   }
 

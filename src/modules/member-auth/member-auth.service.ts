@@ -27,6 +27,7 @@ import type {
 import type {
   CheckUserResponse,
   LoginResponse,
+  LoginPhoneNumberResponse,
   OtpSendResponse,
   VerifyOtpResponse,
   ResetPasswordResponse,
@@ -199,7 +200,7 @@ export class MemberAuthService {
   // =========================================================================
   // 3. Login with Phone Number (POST /login_phonenumber)
   // =========================================================================
-  async loginPhoneNumber(dto: LoginPhoneNumberDto): Promise<OtpSendResponse> {
+  async loginPhoneNumber(dto: LoginPhoneNumberDto): Promise<LoginPhoneNumberResponse> {
     const user = await this.userMasterRepo.findUserForAuth(null, dto.phoneNumber);
 
     if (!user) {
@@ -218,14 +219,36 @@ export class MemberAuthService {
       });
     }
 
-    // Dispatches OTP via Fast2SMS
-    return this.generateAndSendOtpInternal(dto.phoneNumber, 'login');
+    // Step 1: Member check only. Does NOT generate or send OTP. Does NOT call Fast2SMS.
+    return {
+      success: true,
+      message: 'Phone number verified. Proceed with OTP generation.',
+    };
   }
 
   // =========================================================================
   // 4. Generate OTP (POST /generate_otp)
   // =========================================================================
   async generateOtp(dto: GenerateOtpDto): Promise<OtpSendResponse> {
+    // Step 2: Validate that member exists before generating OTP
+    const user = await this.userMasterRepo.findUserForAuth(null, dto.phoneNumber);
+
+    if (!user) {
+      throw new NotFoundException({
+        success: false,
+        message: 'No registered user found with this phone number. Please register first.',
+        errors: [],
+      });
+    }
+
+    if (!user.status) {
+      throw new UnauthorizedException({
+        success: false,
+        message: 'Account is inactive or disabled. Please contact Haatza support.',
+        errors: [],
+      });
+    }
+
     const purpose = dto.purpose || 'login';
     return this.generateAndSendOtpInternal(dto.phoneNumber, purpose);
   }
@@ -237,7 +260,7 @@ export class MemberAuthService {
     phoneNumber: string,
     purpose: string,
   ): Promise<OtpSendResponse> {
-    // 1. Rate limiting check (cooldown)
+    // 1. Rate limiting check (cooldown to prevent duplicate OTP generation)
     const recentOtp = await this.prisma.otpStorage.findFirst({
       where: {
         phoneNumber,
@@ -292,7 +315,7 @@ export class MemberAuthService {
 
     return {
       success: true,
-      message: 'OTP Sent Successfully',
+      message: 'OTP sent successfully.',
     };
   }
 
@@ -421,6 +444,24 @@ export class MemberAuthService {
   // 6. Resend OTP (POST /resend_otp)
   // =========================================================================
   async resendOtp(dto: ResendOtpDto): Promise<OtpSendResponse> {
+    const user = await this.userMasterRepo.findUserForAuth(null, dto.phoneNumber);
+
+    if (!user) {
+      throw new NotFoundException({
+        success: false,
+        message: 'No registered user found with this phone number. Please register first.',
+        errors: [],
+      });
+    }
+
+    if (!user.status) {
+      throw new UnauthorizedException({
+        success: false,
+        message: 'Account is inactive or disabled. Please contact Haatza support.',
+        errors: [],
+      });
+    }
+
     const purpose = dto.purpose || 'login';
     return this.generateAndSendOtpInternal(dto.phoneNumber, purpose);
   }

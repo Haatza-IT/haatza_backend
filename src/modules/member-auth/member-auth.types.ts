@@ -44,6 +44,11 @@ export interface LoginResponse {
   };
 }
 
+export interface LoginPhoneNumberResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface OtpSendResponse {
   success: boolean;
   message: string;
