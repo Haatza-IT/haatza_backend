@@ -258,6 +258,6 @@ export const productQuerySchema = z.object({
     if (val === 'false') return false;
     return val;
   }, z.boolean().optional()),
-  sortBy: z.enum(['createdAt', 'price', 'productName', 'priorityScore', 'sales']).optional().default('createdAt'),
+  sortBy: z.enum(['productId', 'price', 'productName', 'priorityScore', 'sales', 'createdAt']).optional().default('productId'),
   sortOrder: z.enum(['asc', 'desc']).optional().default('desc'),
 });

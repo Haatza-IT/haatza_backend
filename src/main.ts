@@ -152,6 +152,21 @@ async function bootstrap() {
   // Explicit body parser control to avoid double-parsing or conflicts
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
+  // High-resolution response timing middleware for performance auditing and observability
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const start = performance.now();
+    const originalEnd = res.end;
+    res.end = function (...args: any[]) {
+      const duration = (performance.now() - start).toFixed(2);
+      if (!res.headersSent) {
+        res.setHeader('X-Response-Time', `${duration}ms`);
+        res.setHeader('Server-Timing', `total;dur=${duration}`);
+      }
+      return (originalEnd as any).apply(this, args);
+    };
+    next();
+  });
+
   // 1. Explicit JSON & URL-encoded request body size limit (100KB)
   // Rejects oversized request bodies with HTTP 413 Payload Too Large
   app.use(express.json({ limit: '100kb' }));
@@ -212,6 +227,8 @@ async function bootstrap() {
     exposedHeaders: [
       'x-access-token',
       'Authorization',
+      'X-Response-Time',
+      'Server-Timing',
     ],
     maxAge: 86400, // 24 hours preflight cache duration
     preflightContinue: false,

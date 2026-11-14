@@ -21,29 +21,29 @@ export class NestExpertsService {
 
   /**
    * Updates an existing user's Nest Expert status in the user_masters table.
-   * Touches ONLY the isNestExpert column; all other roles remain untouched.
+   * Direct single-query update catching P2025 (RecordNotFound) eliminates 1 DB round-trip.
    */
   async updateNestExpertStatus(dto: NestExpertUpdateDto): Promise<NestExpertResponse> {
-    // 1. Verify user exists in database
-    const existing = await this.userRepository.findById(dto.userId);
-    if (!existing) {
-      throw new NotFoundException({
-        success: false,
-        message: NEST_EXPERT_MESSAGES.USER_NOT_FOUND,
-        errors: [],
-      });
+    try {
+      const updated = await this.userRepository.updateNestExpertRole(
+        dto.userId,
+        dto.isNestExpert,
+      );
+
+      return {
+        success: true,
+        message: NEST_EXPERT_MESSAGES.UPDATED_SUCCESS,
+        data: this.sanitizeNestExpert(updated),
+      };
+    } catch (err: any) {
+      if (err?.code === 'P2025') {
+        throw new NotFoundException({
+          success: false,
+          message: NEST_EXPERT_MESSAGES.USER_NOT_FOUND,
+          errors: [],
+        });
+      }
+      throw err;
     }
-
-    // 2. Update ONLY the isNestExpert field
-    const updated = await this.userRepository.updateNestExpertRole(
-      dto.userId,
-      dto.isNestExpert,
-    );
-
-    return {
-      success: true,
-      message: NEST_EXPERT_MESSAGES.UPDATED_SUCCESS,
-      data: this.sanitizeNestExpert(updated),
-    };
   }
 }

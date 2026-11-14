@@ -339,5 +339,22 @@ export class AuthService {
       return false;
     }
   }
+
+  /**
+   * Revokes all active refresh tokens for a user (used upon password reset or security breach).
+   */
+  async revokeAllUserSessions(userId: string, reason = 'Security revocation / password reset'): Promise<number> {
+    const res = await this.prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        isRevoked: false,
+      },
+      data: {
+        isRevoked: true,
+        updatedBy: reason,
+      },
+    });
+    return res.count;
+  }
 }
 

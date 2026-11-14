@@ -21,29 +21,29 @@ export class EmployeesService {
 
   /**
    * Updates an existing user's employee status in the user_masters table.
-   * Touches ONLY the isHaatzaEmployee column; all other roles remain untouched.
+   * Direct single-query update catching P2025 (RecordNotFound) eliminates 1 DB round-trip.
    */
   async updateEmployeeStatus(dto: EmployeeUpdateDto): Promise<EmployeeResponse> {
-    // 1. Verify user exists in database
-    const existing = await this.userRepository.findById(dto.userId);
-    if (!existing) {
-      throw new NotFoundException({
-        success: false,
-        message: EMPLOYEE_MESSAGES.USER_NOT_FOUND,
-        errors: [],
-      });
+    try {
+      const updated = await this.userRepository.updateEmployeeRole(
+        dto.userId,
+        dto.isHaatzaEmployee,
+      );
+
+      return {
+        success: true,
+        message: EMPLOYEE_MESSAGES.UPDATED_SUCCESS,
+        data: this.sanitizeEmployee(updated),
+      };
+    } catch (err: any) {
+      if (err?.code === 'P2025') {
+        throw new NotFoundException({
+          success: false,
+          message: EMPLOYEE_MESSAGES.USER_NOT_FOUND,
+          errors: [],
+        });
+      }
+      throw err;
     }
-
-    // 2. Update ONLY the isHaatzaEmployee field
-    const updated = await this.userRepository.updateEmployeeRole(
-      dto.userId,
-      dto.isHaatzaEmployee,
-    );
-
-    return {
-      success: true,
-      message: EMPLOYEE_MESSAGES.UPDATED_SUCCESS,
-      data: this.sanitizeEmployee(updated),
-    };
   }
 }

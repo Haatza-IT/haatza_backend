@@ -41,6 +41,51 @@ export class UserMasterRepository {
   }
 
   /**
+   * Finds a user for authentication by email or phone with targeted projection.
+   */
+  async findUserForAuth(email?: string | null, phoneNumber?: string | null) {
+    const conditions = [];
+    if (email) conditions.push({ email });
+    if (phoneNumber) conditions.push({ phoneNumber });
+    if (conditions.length === 0) return null;
+
+    return this.prisma.userMaster.findFirst({
+      where: conditions.length === 1 ? conditions[0] : { OR: conditions },
+      select: {
+        userId: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        password: true,
+        referralCode: true,
+        status: true,
+      },
+    });
+  }
+
+  /**
+   * Checks user existence by email or phone in a single query with minimal projection.
+   */
+  async findUserForCheck(phoneNumber?: string | null, email?: string | null) {
+    const conditions = [];
+    if (phoneNumber) conditions.push({ phoneNumber });
+    if (email) conditions.push({ email });
+    if (conditions.length === 0) return null;
+
+    return this.prisma.userMaster.findFirst({
+      where: conditions.length === 1 ? conditions[0] : { OR: conditions },
+      select: {
+        userId: true,
+        name: true,
+        email: true,
+        phoneNumber: true,
+        referralCode: true,
+        status: true,
+      },
+    });
+  }
+
+  /**
    * Checks for duplicate user by email OR phone number.
    */
   async findByEmailOrPhone(
@@ -219,6 +264,23 @@ export class UserMasterRepository {
       where: { userId },
       data: {
         isNestExpert,
+        ...(updatedBy ? { updatedBy } : {}),
+      },
+    });
+  }
+
+  /**
+   * Updates an existing user's password and optionally updatedBy timestamp.
+   */
+  async updatePassword(
+    userId: string,
+    hashedPassword: string,
+    updatedBy?: string | null,
+  ): Promise<UserMaster> {
+    return this.prisma.userMaster.update({
+      where: { userId },
+      data: {
+        password: hashedPassword,
         ...(updatedBy ? { updatedBy } : {}),
       },
     });

@@ -70,9 +70,10 @@ export class AuthController {
   }
 
   /**
-   * Revokes member refresh token and clears the authentication cookie.
+   * Revokes member refresh token and clears the authentication cookie (Logout).
+   * Supports both POST /api/auth/revoke and POST /api/auth/logout.
    */
-  @Post('revoke')
+  @Post(['revoke', 'logout'])
   @HttpCode(HttpStatus.OK)
   async revokeToken(
     @Req() req: Request,

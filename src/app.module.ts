@@ -9,6 +9,8 @@ import { NestExpertsModule } from './modules/nest-experts/nest-experts.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ProductsModule } from './modules/products/products.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { MemberAuthModule } from './modules/member-auth/member-auth.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     NestExpertsModule,
     ProductsModule,
     DashboardModule,
+    MemberAuthModule,
+    HealthModule,
   ],
   providers: [
     {

@@ -17,36 +17,23 @@ export class SellersService {
   /**
    * Generates a unique referral code starting with 'HZ'.
    */
-  async generateUniqueReferralCode(): Promise<string> {
+  generateReferralCodeCandidate(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    for (let i = 0; i < this.MAX_RETRIES; i++) {
-      let code = 'HZ';
-      const bytes = crypto.randomBytes(6);
-      for (let j = 0; j < 6; j++) {
-        code += chars[bytes[j] % chars.length];
-      }
-      const existing = await this.userRepository.checkReferralCodeExists(code);
-      if (!existing) {
-        return code;
-      }
+    let code = 'HZ';
+    const bytes = crypto.randomBytes(6);
+    for (let j = 0; j < 6; j++) {
+      code += chars[bytes[j] % chars.length];
     }
-    return `HZ${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+    return code;
   }
 
   /**
    * Generates a unique seller ID starting with 'HSL-'.
-   * Owned exclusively by Seller business logic.
+   * Uses 8 hexadecimal random characters (over 4.29 billion unique possibilities).
    */
-  async generateUniqueSellerId(): Promise<string> {
-    for (let i = 0; i < this.MAX_RETRIES; i++) {
-      const hex = crypto.randomBytes(4).toString('hex').toUpperCase();
-      const candidate = `HSL-${hex}`;
-      const existing = await this.userRepository.checkSellerIdExists(candidate);
-      if (!existing) {
-        return candidate;
-      }
-    }
-    return `HSL-${Date.now().toString(36).toUpperCase()}`;
+  generateSellerIdCandidate(): string {
+    const hex = crypto.randomBytes(4).toString('hex').toUpperCase();
+    return `HSL-${hex}`;
   }
 
   /**
@@ -78,8 +65,13 @@ export class SellersService {
    * Registers a Haatza Seller with full profile, tax, and banking details.
    */
   async registerSeller(dto: SellerRegistrationDto): Promise<SellerResponse> {
-    // 1. Conflict detection for email or phone
-    const existing = await this.userRepository.findByEmailOrPhone(dto.email, dto.phoneNumber);
+    // 1. High-Performance Parallelization:
+    // Run duplicate email/phone check (Network) and bcrypt hashing (CPU) simultaneously.
+    const [existing, hashedPassword] = await Promise.all([
+      this.userRepository.findByEmailOrPhone(dto.email, dto.phoneNumber),
+      hashPassword(dto.passcode),
+    ]);
+
     if (existing) {
       if (existing.email === dto.email) {
         throw new ConflictException({
@@ -97,12 +89,9 @@ export class SellersService {
       }
     }
 
-    // 2. Hash passcode with bcrypt (12 rounds)
-    const hashedPassword = await hashPassword(dto.passcode);
-
-    // 3. Generate unique sellerId and referralCode
-    const sellerId = await this.generateUniqueSellerId();
-    const referralCode = await this.generateUniqueReferralCode();
+    // 2. Generate unique sellerId and referralCode candidates in memory without extra network round-trips
+    const sellerId = this.generateSellerIdCandidate();
+    const referralCode = this.generateReferralCodeCandidate();
 
     // 4. Persist to database
     const createdSeller = await this.userRepository.createSeller({

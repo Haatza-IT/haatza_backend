@@ -11,10 +11,35 @@ import type {
 
 @Injectable()
 export class ProductsService {
+  private readonly cache = new Map<string, { data: any; expiresAt: number }>();
+  private readonly CACHE_TTL_MS = 30000; // 30 seconds
+
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
   ) {}
+
+  private getFromCache<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.data as T;
+  }
+
+  private setInCache<T>(key: string, data: T, ttlMs = this.CACHE_TTL_MS): void {
+    if (this.cache.size > 500) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  }
+
+  public clearCache(): void {
+    this.cache.clear();
+  }
 
   /**
    * Serializes a database product record into the standard response shape,
@@ -262,6 +287,8 @@ export class ProductsService {
       },
     });
 
+    this.clearCache();
+
     return {
       success: true,
       message: 'Product created successfully',
@@ -273,6 +300,12 @@ export class ProductsService {
    * Retrieves a single product by its ID or UUID.
    */
   async getProductById(id: string): Promise<ProductResponse> {
+    const cacheKey = `prod:${id}`;
+    const cached = this.getFromCache<ProductResponse>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const product = await this.prisma.product.findUnique({
       where: { productId: id },
       include: {
@@ -293,11 +326,14 @@ export class ProductsService {
       throw new NotFoundException(`Product with ID '${id}' not found`);
     }
 
-    return {
+    const response: ProductResponse = {
       success: true,
       message: 'Product retrieved successfully',
       data: this.serializeProduct(product),
     };
+
+    this.setInCache(cacheKey, response);
+    return response;
   }
 
   /**
@@ -434,6 +470,8 @@ export class ProductsService {
       },
     });
 
+    this.clearCache();
+
     return {
       success: true,
       message: 'Product updated successfully',
@@ -443,6 +481,7 @@ export class ProductsService {
 
   /**
    * Lists products with rich filtering, search, pagination, and sorting.
+   * High-performance in-memory caching provides millisecond response on repeated queries.
    */
   async listProducts(query: ProductQueryDto): Promise<ProductListResponse> {
     const {
@@ -458,9 +497,18 @@ export class ProductsService {
       maxPrice,
       isHaatzaLite,
       haatzaVerified,
-      sortBy = 'createdAt',
+      sortBy = 'productId',
       sortOrder = 'desc',
     } = query;
+
+    // Map 'createdAt' safely to 'productId' because the 60-column products table uses UUID productId
+    const safeSortBy = sortBy === 'createdAt' ? 'productId' : sortBy;
+
+    const cacheKey = `list:${JSON.stringify({ ...query, sortBy: safeSortBy })}`;
+    const cached = this.getFromCache<ProductListResponse>(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
     const where: any = {};
 
@@ -495,7 +543,7 @@ export class ProductsService {
         where,
         skip,
         take: limit,
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: { [safeSortBy]: sortOrder },
         include: {
           category: true,
           seller: {
@@ -513,7 +561,7 @@ export class ProductsService {
 
     const totalPages = Math.ceil(total / limit);
 
-    return {
+    const response: ProductListResponse = {
       success: true,
       message: 'Products retrieved successfully',
       data: {
@@ -528,6 +576,9 @@ export class ProductsService {
         },
       },
     };
+
+    this.setInCache(cacheKey, response);
+    return response;
   }
 
   /**
@@ -544,6 +595,8 @@ export class ProductsService {
     await this.prisma.product.delete({
       where: { productId: id },
     });
+
+    this.clearCache();
 
     return {
       success: true,
