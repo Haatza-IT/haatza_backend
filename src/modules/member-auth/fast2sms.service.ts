@@ -31,7 +31,9 @@ export class Fast2SmsService {
       };
     }
 
-    const apiKey = process.env.FAST2SMS_API_KEY;
+    const apiKey =
+      process.env.FAST2SMS_API_KEY ||
+      'U7SGzfsYaueBEK1XrokqhQVOlbnNwC6ypm5Fcxiv8Z2HMAPDLgpw6LlQOo3RsIWrUmYSkuN15Cqa29fg';
     if (!apiKey || apiKey.trim().length === 0) {
       this.logger.error('Fast2SMS API key (FAST2SMS_API_KEY) is missing in environment variables');
       return {
