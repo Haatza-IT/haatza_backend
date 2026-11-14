@@ -205,7 +205,7 @@ model OtpStorage {
   id          String    @id @default(uuid())
   phoneNumber String    @map("phone_number") @db.VarChar(15)
   otpHash     String    @map("otp_hash") @db.VarChar(128)
-  otpCode     String?   @map("otp_code") @db.VarChar(6)
+  otpCode     String?   @map("otp_code") @db.VarChar(255)
   purpose     String    @default("login") @map("purpose") @db.VarChar(50)
   expiresAt   DateTime  @map("expires_at")
   isVerified  Boolean   @default(false) @map("is_verified")

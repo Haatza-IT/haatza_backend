@@ -41,6 +41,7 @@ export class MemberAuthService {
   private readonly MAX_VERIFY_ATTEMPTS = 5;
   private readonly checkUserCache = new Map<string, { data: CheckUserResponse; expiresAt: number }>();
   private readonly CHECK_CACHE_TTL_MS = 60000; // 60s cache for ultra-fast checkUser responses
+  private readonly activeLocks = new Map<string, Promise<void>>();
 
   constructor(
     @Inject(PrismaService)
@@ -52,6 +53,83 @@ export class MemberAuthService {
     @Inject(Fast2SmsService)
     private readonly fast2smsService: Fast2SmsService,
   ) {}
+
+  /**
+   * Concurrency mutex ensuring atomic execution per phone number & purpose.
+   */
+  private async runWithLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    while (this.activeLocks.has(key)) {
+      await this.activeLocks.get(key);
+    }
+    let resolveLock!: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      resolveLock = resolve;
+    });
+    this.activeLocks.set(key, lockPromise);
+
+    try {
+      return await fn();
+    } finally {
+      this.activeLocks.delete(key);
+      resolveLock();
+    }
+  }
+
+  /**
+   * Securely derives a 32-byte key for AES-256-GCM authenticated encryption.
+   */
+  private getEncryptionKey(): Buffer {
+    const rawKey =
+      process.env.OTP_ENCRYPTION_KEY ||
+      process.env.JWT_SECRET ||
+      'haatza_secure_otp_default_encryption_key_2026';
+    return crypto.createHash('sha256').update(rawKey).digest();
+  }
+
+  /**
+   * Encrypts a 6-digit OTP using AES-256-GCM (authenticated encryption).
+   * Generates a 12-byte random IV and 16-byte authentication tag.
+   * Format: `${ivHex}:${authTagHex}:${cipherHex}` (70 chars).
+   */
+  private encryptOtp(otp: string): string {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', this.getEncryptionKey(), iv);
+    let encrypted = cipher.update(otp, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    const authTag = cipher.getAuthTag().toString('hex');
+    return `${iv.toString('hex')}:${authTag}:${encrypted}`;
+  }
+
+  /**
+   * Decrypts an AES-256-GCM encrypted OTP payload.
+   * Verifies the authTag; returns null if tampered or invalid.
+   */
+  private decryptOtp(payload: string): string | null {
+    try {
+      const parts = payload.split(':');
+      if (parts.length !== 3) return null;
+      const [ivHex, authTagHex, cipherHex] = parts;
+      const iv = Buffer.from(ivHex, 'hex');
+      const authTag = Buffer.from(authTagHex, 'hex');
+      const decipher = crypto.createDecipheriv('aes-256-gcm', this.getEncryptionKey(), iv);
+      decipher.setAuthTag(authTag);
+      let decrypted = decipher.update(cipherHex, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    } catch (err) {
+      this.logger.error(`Failed to decrypt OTP: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Constant-time verification of OTP SHA-256 hash to prevent timing attacks.
+   */
+  private verifyOtpHash(inputOtp: string, storedHash: string): boolean {
+    const inputHash = this.hashOtp(inputOtp);
+    if (inputHash.length !== storedHash.length) return false;
+    return crypto.timingSafeEqual(Buffer.from(inputHash, 'hex'), Buffer.from(storedHash, 'hex'));
+  }
 
   /**
    * Generates a cryptographically strong 6-digit numeric OTP.
@@ -255,68 +333,161 @@ export class MemberAuthService {
 
   /**
    * Internal helper handling rate limiting, storage, and SMS dispatch.
+   * Enforces 5-minute backend OTP validity, authenticated AES-256-GCM encryption,
+   * same-OTP reuse, and concurrency protection.
    */
   private async generateAndSendOtpInternal(
     phoneNumber: string,
     purpose: string,
   ): Promise<OtpSendResponse> {
-    // 1. Rate limiting check (cooldown to prevent duplicate OTP generation)
-    const recentOtp = await this.prisma.otpStorage.findFirst({
-      where: {
-        phoneNumber,
-        purpose,
-        createdAt: {
-          gte: new Date(Date.now() - this.RESEND_COOLDOWN_SECONDS * 1000),
+    const lockKey = `${phoneNumber}:${purpose}`;
+
+    return this.runWithLock(lockKey, async () => {
+      const now = new Date();
+
+      // 1. Check for an active, unverified, unexpired OTP for this phone number and purpose
+      const activeOtp = await this.prisma.otpStorage.findFirst({
+        where: {
+          phoneNumber,
+          purpose,
+          isVerified: false,
+          expiresAt: {
+            gt: now, // Still valid within the 5-minute backend window
+          },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (recentOtp) {
-      const waitSeconds = Math.ceil(
-        (this.RESEND_COOLDOWN_SECONDS * 1000 - (Date.now() - recentOtp.createdAt.getTime())) / 1000,
-      );
-      throw new BadRequestException({
-        success: false,
-        message: `Please wait ${waitSeconds} seconds before requesting a new OTP`,
-        errors: [],
+        orderBy: { createdAt: 'desc' },
       });
-    }
 
-    // 2. Generate 6-digit OTP
-    const otp = this.generateNumericOtp();
-    const otpHash = this.hashOtp(otp);
-    const expiresAt = new Date(Date.now() + this.OTP_TTL_MINUTES * 60 * 1000);
+      if (activeOtp) {
+        // Cooldown check: prevent immediate repeated spam clicks
+        const lastActionTime = activeOtp.updatedAt || activeOtp.createdAt;
+        const elapsedMs = Date.now() - lastActionTime.getTime();
 
-    // 3. Save in otp_storage
-    await this.prisma.otpStorage.create({
-      data: {
-        phoneNumber,
-        otpHash,
-        otpCode: otp,
-        purpose,
-        expiresAt,
-        isVerified: false,
-        attempts: 0,
-      },
-    });
+        if (elapsedMs < this.RESEND_COOLDOWN_SECONDS * 1000) {
+          const waitSeconds = Math.ceil(
+            (this.RESEND_COOLDOWN_SECONDS * 1000 - elapsedMs) / 1000,
+          );
+          throw new BadRequestException({
+            success: false,
+            message: `Please wait ${waitSeconds} seconds before requesting a new OTP`,
+            errors: [],
+          });
+        }
 
-    // 4. Send SMS via Fast2SMS
-    const smsResult = await this.fast2smsService.sendOtpSms(phoneNumber, otp);
+        // Resend the SAME active OTP without generating a new one
+        // Recover original OTP via authenticated decryption
+        let otpToSend: string | null = null;
+        if (activeOtp.otpCode) {
+          otpToSend = this.decryptOtp(activeOtp.otpCode);
+          if (!otpToSend && /^\d{6}$/.test(activeOtp.otpCode)) {
+            // Support legacy plaintext records if present
+            otpToSend = activeOtp.otpCode;
+          }
+        }
 
-    if (!smsResult.success) {
-      this.logger.warn(`Fast2SMS failed for ${phoneNumber}: ${smsResult.message}`);
+        if (!otpToSend) {
+          // Safeguard: if encrypted payload is somehow unreadable, generate fresh OTP
+          otpToSend = this.generateNumericOtp();
+          await this.prisma.otpStorage.update({
+            where: { id: activeOtp.id },
+            data: {
+              otpHash: this.hashOtp(otpToSend),
+              otpCode: this.encryptOtp(otpToSend),
+              updatedAt: new Date(),
+            },
+          });
+        } else {
+          // Update updatedAt to reset the 30-second resend cooldown timer.
+          // IMPORTANT: Do NOT change createdAt, and do NOT extend expiresAt!
+          await this.prisma.otpStorage.update({
+            where: { id: activeOtp.id },
+            data: {
+              updatedAt: new Date(),
+            },
+          });
+        }
+
+        // Dispatch the same recovered OTP via Fast2SMS
+        const smsResult = await this.fast2smsService.sendOtpSms(phoneNumber, otpToSend);
+
+        if (!smsResult.success) {
+          this.logger.warn(`Fast2SMS failed for ${phoneNumber}: ${smsResult.message}`);
+          return {
+            success: false,
+            message: smsResult.message || 'Failed to dispatch SMS',
+            error: smsResult.detail,
+          };
+        }
+
+        return {
+          success: true,
+          message: 'OTP sent successfully.',
+        };
+      }
+
+      // 2. No active valid OTP exists (either never requested or previous OTP expired > 5 mins ago)
+      // Cooldown check for any very recently created OTP
+      const recentAnyOtp = await this.prisma.otpStorage.findFirst({
+        where: {
+          phoneNumber,
+          purpose,
+          createdAt: {
+            gte: new Date(Date.now() - this.RESEND_COOLDOWN_SECONDS * 1000),
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (recentAnyOtp) {
+        const waitSeconds = Math.ceil(
+          (this.RESEND_COOLDOWN_SECONDS * 1000 - (Date.now() - recentAnyOtp.createdAt.getTime())) / 1000,
+        );
+        if (waitSeconds > 0) {
+          throw new BadRequestException({
+            success: false,
+            message: `Please wait ${waitSeconds} seconds before requesting a new OTP`,
+            errors: [],
+          });
+        }
+      }
+
+      // Generate a new 6-digit secure numeric OTP
+      const newOtp = this.generateNumericOtp();
+      const otpHash = this.hashOtp(newOtp);
+      const encryptedOtp = this.encryptOtp(newOtp);
+      const expiresAt = new Date(Date.now() + this.OTP_TTL_MINUTES * 60 * 1000); // Exactly 5 minutes (300s)
+
+      // Store in otp_storage: verification hash in otp_hash, encrypted OTP in otp_code.
+      // Plaintext OTP is NEVER persisted in the database!
+      await this.prisma.otpStorage.create({
+        data: {
+          phoneNumber,
+          otpHash,
+          otpCode: encryptedOtp,
+          purpose,
+          expiresAt,
+          isVerified: false,
+          attempts: 0,
+        },
+      });
+
+      // Dispatch new OTP via Fast2SMS
+      const smsResult = await this.fast2smsService.sendOtpSms(phoneNumber, newOtp);
+
+      if (!smsResult.success) {
+        this.logger.warn(`Fast2SMS failed for ${phoneNumber}: ${smsResult.message}`);
+        return {
+          success: false,
+          message: smsResult.message || 'Failed to dispatch SMS',
+          error: smsResult.detail,
+        };
+      }
+
       return {
-        success: false,
-        message: smsResult.message || 'Failed to dispatch SMS',
-        error: smsResult.detail,
+        success: true,
+        message: 'OTP sent successfully.',
       };
-    }
-
-    return {
-      success: true,
-      message: 'OTP sent successfully.',
-    };
+    });
   }
 
   // =========================================================================
@@ -356,7 +527,7 @@ export class MemberAuthService {
       };
     }
 
-    // Check expiration
+    // Check expiration using backend server time (5 minutes validity)
     if (new Date() > otpRecord.expiresAt) {
       return {
         success: false,
@@ -364,9 +535,16 @@ export class MemberAuthService {
       };
     }
 
-    // Compare code or SHA-256 hash
-    const inputHash = this.hashOtp(dto.otp);
-    const isValid = otpRecord.otpCode === dto.otp || otpRecord.otpHash === inputHash;
+    // Constant-time hash verification against stored SHA-256 hash
+    let isValid = this.verifyOtpHash(dto.otp, otpRecord.otpHash);
+    if (!isValid && otpRecord.otpCode) {
+      const decrypted = this.decryptOtp(otpRecord.otpCode);
+      if (decrypted && decrypted === dto.otp) {
+        isValid = true;
+      } else if (otpRecord.otpCode === dto.otp) {
+        isValid = true;
+      }
+    }
 
     if (!isValid) {
       // Increment attempt counter
@@ -506,6 +684,7 @@ export class MemberAuthService {
       where: {
         phoneNumber: dto.phoneNumber,
         purpose: 'forgot_password',
+        isVerified: false,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -534,8 +713,15 @@ export class MemberAuthService {
       });
     }
 
-    const inputHash = this.hashOtp(dto.otp);
-    const isValid = otpRecord.otpCode === dto.otp || otpRecord.otpHash === inputHash;
+    let isValid = this.verifyOtpHash(dto.otp, otpRecord.otpHash);
+    if (!isValid && otpRecord.otpCode) {
+      const decrypted = this.decryptOtp(otpRecord.otpCode);
+      if (decrypted && decrypted === dto.otp) {
+        isValid = true;
+      } else if (otpRecord.otpCode === dto.otp) {
+        isValid = true;
+      }
+    }
 
     if (!isValid) {
       await this.prisma.otpStorage.update({
