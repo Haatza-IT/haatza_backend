@@ -120,48 +120,14 @@ export const resendOtpSchema = z.object({
 export type ResendOtpDto = z.infer<typeof resendOtpSchema>;
 
 export const forgotPasswordSchema = z.object({
-  phoneNumber: z.string().trim().optional(),
-  phone: z.string().trim().optional(),
-  email: z.string().trim().optional(),
-  identifier: z.string().trim().optional(),
-}).refine((data) => !!(data.phoneNumber || data.phone || data.email || data.identifier), {
-  message: 'Either phoneNumber or email is required',
-}).transform((data) => {
-  const rawPhone = data.phoneNumber || data.phone || (data.identifier && /^\+?\d[\d\s\-()]{7,15}$/.test(data.identifier) ? data.identifier : undefined);
-  const rawEmail = data.email || (data.identifier && data.identifier.includes('@') ? data.identifier : undefined);
-
-  return {
-    phoneNumber: rawPhone ? normalizeAndValidatePhone(rawPhone) : null,
-    email: rawEmail ? rawEmail.toLowerCase().trim() : null,
-  };
+  email: emailSchema,
 });
 
 export type ForgotPasswordDto = z.infer<typeof forgotPasswordSchema>;
 
 export const resetPasswordSchema = z.object({
-  phoneNumber: z.string().trim().optional(),
-  phone: z.string().trim().optional(),
-  otp: z.string().trim().regex(/^\d{6}$/, { message: 'OTP must be exactly 6 numeric digits' }),
+  token: z.string().trim().min(1, 'Password reset token is required'),
   newPassword: passcodeSchema,
-}).refine((data) => !!(data.phoneNumber || data.phone), {
-  message: 'phoneNumber is required',
-}).transform((data) => {
-  const raw = data.phoneNumber || data.phone || '';
-  const cleaned = normalizeAndValidatePhone(raw);
-  if (!cleaned) {
-    throw new z.ZodError([
-      {
-        code: z.ZodIssueCode.custom,
-        path: ['phoneNumber'],
-        message: 'Invalid phone number. Must be a valid 10-digit Indian phone number starting with 6-9.',
-      },
-    ]);
-  }
-  return {
-    phoneNumber: cleaned,
-    otp: data.otp,
-    newPassword: data.newPassword,
-  };
 });
 
 export type ResetPasswordDto = z.infer<typeof resetPasswordSchema>;

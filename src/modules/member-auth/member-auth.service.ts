@@ -12,6 +12,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { UserMasterRepository } from '../../database/user-master.repository';
 import { AuthService } from '../auth/auth.service';
 import { Fast2SmsService } from './fast2sms.service';
+import { EmailService } from './email.service';
 import { hashPassword, verifyPassword } from '../../common/utils/password.util';
 import type { ClientAuditContext } from '../auth/auth.types';
 import type {
@@ -30,6 +31,7 @@ import type {
   LoginPhoneNumberResponse,
   OtpSendResponse,
   VerifyOtpResponse,
+  ForgotPasswordResponse,
   ResetPasswordResponse,
 } from './member-auth.types';
 
@@ -39,6 +41,7 @@ export class MemberAuthService {
   private readonly OTP_TTL_MINUTES = 5;
   private readonly RESEND_COOLDOWN_SECONDS = 30;
   private readonly MAX_VERIFY_ATTEMPTS = 5;
+  private readonly RESET_TOKEN_TTL_MINUTES = 15;
   private readonly checkUserCache = new Map<string, { data: CheckUserResponse; expiresAt: number }>();
   private readonly CHECK_CACHE_TTL_MS = 60000; // 60s cache for ultra-fast checkUser responses
   private readonly activeLocks = new Map<string, Promise<void>>();
@@ -52,6 +55,8 @@ export class MemberAuthService {
     private readonly authService: AuthService,
     @Inject(Fast2SmsService)
     private readonly fast2smsService: Fast2SmsService,
+    @Inject(EmailService)
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -647,128 +652,180 @@ export class MemberAuthService {
   // =========================================================================
   // 7. Forgot Password (POST /forgot_password)
   // =========================================================================
-  async forgotPassword(dto: ForgotPasswordDto): Promise<OtpSendResponse> {
-    let user = null;
-    if (dto.phoneNumber) {
-      user = await this.userMasterRepo.findByPhoneNumber(dto.phoneNumber);
-    }
-    if (!user && dto.email) {
-      user = await this.userMasterRepo.findByEmail(dto.email);
-    }
+  async forgotPassword(dto: ForgotPasswordDto): Promise<ForgotPasswordResponse> {
+    const normalizedEmail = dto.email.trim().toLowerCase();
+    const genericResponse: ForgotPasswordResponse = {
+      success: true,
+      message: 'If an account exists with this email, a password reset link has been sent.',
+    };
 
+    // 1. Search for user by email in user_masters
+    const user = await this.userMasterRepo.findByEmail(normalizedEmail);
     if (!user) {
-      throw new NotFoundException({
-        success: false,
-        message: 'No registered user found with the provided details.',
-        errors: [],
-      });
+      // Security: Return generic message to prevent account enumeration
+      return genericResponse;
     }
 
     if (!user.status) {
-      throw new UnauthorizedException({
-        success: false,
-        message: 'Account is inactive or disabled. Please contact Haatza support.',
-        errors: [],
+      // Account is deactivated / disabled
+      return genericResponse;
+    }
+
+    // 2. Rate-limiting check: prevent rapid spamming (allow at most 1 token per 60s per user)
+    const recentToken = await this.prisma.passwordResetToken.findFirst({
+      where: {
+        userId: user.userId,
+        createdAt: {
+          gte: new Date(Date.now() - 60 * 1000),
+        },
+      },
+    });
+
+    if (recentToken) {
+      // Generic response without generating redundant email
+      return genericResponse;
+    }
+
+    // 3. Generate a cryptographically secure random token (32 bytes = 64 hex characters)
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + this.RESET_TOKEN_TTL_MINUTES * 60 * 1000);
+
+    // 4. Invalidate any previous unused reset tokens for this user
+    await this.prisma.passwordResetToken.updateMany({
+      where: {
+        userId: user.userId,
+        usedAt: null,
+      },
+      data: {
+        usedAt: new Date(),
+      },
+    });
+
+    // 5. Store SHA-256 hash in database with 15-minute expiry
+    const resetRecord = await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.userId,
+        tokenHash,
+        expiresAt,
+        usedAt: null,
+      },
+    });
+
+    // 6. Generate password reset link using FRONTEND_URL
+    const frontendBase = (process.env.FRONTEND_URL || 'https://haatza.com').split(',')[0].trim().replace(/\/+$/, '');
+    const resetUrl = `${frontendBase}/reset-password?token=${rawToken}`;
+
+    // 7. Dispatch the password reset email
+    const emailResult = await this.emailService.sendPasswordResetEmail(user.email, resetUrl, user.name);
+
+    // 8. If email delivery failed, invalidate token immediately so it cannot be used
+    if (!emailResult.success) {
+      this.logger.error(`Failed to dispatch reset email to user ${user.userId}`);
+      await this.prisma.passwordResetToken.update({
+        where: { id: resetRecord.id },
+        data: { usedAt: new Date() },
       });
     }
 
-    return this.generateAndSendOtpInternal(user.phoneNumber, 'forgot_password');
+    return genericResponse;
   }
 
   // =========================================================================
   // 8. Reset Password (POST /reset_password)
   // =========================================================================
   async resetPassword(dto: ResetPasswordDto): Promise<ResetPasswordResponse> {
-    // 1. Verify OTP
-    const otpRecord = await this.prisma.otpStorage.findFirst({
-      where: {
-        phoneNumber: dto.phoneNumber,
-        purpose: 'forgot_password',
-        isVerified: false,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    // 1. Hash submitted token using SHA-256
+    const tokenHash = crypto.createHash('sha256').update(dto.token).digest('hex');
+    const lockKey = `reset:${tokenHash}`;
 
-    if (!otpRecord) {
-      throw new BadRequestException({
-        success: false,
-        message: 'No password reset OTP request found for this phone number.',
-        errors: [],
+    return this.runWithLock(lockKey, async () => {
+      // 2. Find matching reset token in database
+      const resetRecord = await this.prisma.passwordResetToken.findUnique({
+        where: { tokenHash },
+        include: { user: true },
       });
-    }
 
-    if (otpRecord.attempts >= this.MAX_VERIFY_ATTEMPTS) {
-      throw new BadRequestException({
-        success: false,
-        message: 'Maximum verification attempts exceeded. Please request a new password reset OTP.',
-        errors: [],
-      });
-    }
-
-    if (new Date() > otpRecord.expiresAt) {
-      throw new BadRequestException({
-        success: false,
-        message: 'Password reset OTP has expired. Please request a new OTP.',
-        errors: [],
-      });
-    }
-
-    let isValid = this.verifyOtpHash(dto.otp, otpRecord.otpHash);
-    if (!isValid && otpRecord.otpCode) {
-      const decrypted = this.decryptOtp(otpRecord.otpCode);
-      if (decrypted && decrypted === dto.otp) {
-        isValid = true;
-      } else if (otpRecord.otpCode === dto.otp) {
-        isValid = true;
+      // 3. Verify token exists
+      if (!resetRecord) {
+        throw new BadRequestException({
+          success: false,
+          message: 'This password reset link is invalid or has expired.',
+          errors: [],
+        });
       }
-    }
 
-    if (!isValid) {
-      await this.prisma.otpStorage.update({
-        where: { id: otpRecord.id },
-        data: { attempts: { increment: 1 } },
+      // 4. Verify token has not expired (15-minute validity)
+      if (new Date() > resetRecord.expiresAt) {
+        throw new BadRequestException({
+          success: false,
+          message: 'This password reset link is invalid or has expired.',
+          errors: [],
+        });
+      }
+
+      // 5. Verify token has not already been used
+      if (resetRecord.usedAt !== null) {
+        throw new BadRequestException({
+          success: false,
+          message: 'This password reset link is invalid or has expired.',
+          errors: [],
+        });
+      }
+
+      // 6. Verify user is active
+      if (!resetRecord.user || !resetRecord.user.status) {
+        throw new BadRequestException({
+          success: false,
+          message: 'This password reset link is invalid or has expired.',
+          errors: [],
+        });
+      }
+
+      // 7. Hash new password with bcrypt 12 salt rounds
+      const hashedPassword = await hashPassword(dto.newPassword);
+
+      // 8. Atomically update password in user_masters and mark token as used in a transaction
+      await this.prisma.$transaction(async (tx) => {
+        // Atomic consumption: usedAt: null condition ensures token cannot be double-spent
+        const consumed = await tx.passwordResetToken.updateMany({
+          where: {
+            id: resetRecord.id,
+            usedAt: null,
+          },
+          data: {
+            usedAt: new Date(),
+          },
+        });
+
+        if (consumed.count === 0) {
+          throw new BadRequestException({
+            success: false,
+            message: 'This password reset link is invalid or has expired.',
+            errors: [],
+          });
+        }
+
+        // Update password in user_masters
+        await tx.userMaster.update({
+          where: { userId: resetRecord.userId },
+          data: {
+            password: hashedPassword,
+            updatedBy: 'Password reset via email token',
+          },
+        });
       });
-      throw new BadRequestException({
-        success: false,
-        message: 'Invalid OTP code provided',
-        errors: [],
-      });
-    }
 
-    // 2. Find user
-    const user = await this.userMasterRepo.findByPhoneNumber(dto.phoneNumber);
-    if (!user) {
-      throw new NotFoundException({
-        success: false,
-        message: 'User account not found',
-        errors: [],
-      });
-    }
+      // 9. Invalidate all active user sessions / refresh tokens
+      await this.authService.revokeAllUserSessions(resetRecord.userId, 'Password reset via email token');
 
-    // 3. Hash new password with bcrypt 12 salt rounds
-    const hashedPassword = await hashPassword(dto.newPassword);
+      this.logger.log(`Password reset successfully for user ${resetRecord.userId}`);
 
-    // 4. Update password in user_masters
-    await this.userMasterRepo.updatePassword(user.userId, hashedPassword, 'Password reset via OTP');
-
-    // 5. Invalidate OTP record
-    await this.prisma.otpStorage.update({
-      where: { id: otpRecord.id },
-      data: {
-        isVerified: true,
-        verifiedAt: new Date(),
-      },
+      return {
+        success: true,
+        message: 'Password reset successfully. You can now login with your new password.',
+      };
     });
-
-    // 6. Revoke all active sessions / refresh tokens
-    await this.authService.revokeAllUserSessions(user.userId, 'Password reset by user');
-
-    this.logger.log(`Password reset successfully for user ${user.userId} (${dto.phoneNumber})`);
-
-    return {
-      success: true,
-      message: 'Password reset successfully. You can now login with your new password.',
-    };
   }
 }
 

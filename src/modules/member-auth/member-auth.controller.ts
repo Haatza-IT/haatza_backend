@@ -37,6 +37,7 @@ import type {
   LoginPhoneNumberResponse,
   OtpSendResponse,
   VerifyOtpResponse,
+  ForgotPasswordResponse,
   ResetPasswordResponse,
 } from './member-auth.types';
 import type { ClientAuditContext } from '../auth/auth.types';
@@ -149,19 +150,20 @@ export class MemberAuthController {
 
   /**
    * 7. POST /forgot_password
-   * Sends password recovery OTP to registered phone number.
+   * Generates secure reset token and sends recovery link to user's registered email.
+   * Returns generic message to prevent email enumeration.
    */
   @Post('forgot_password')
   @HttpCode(HttpStatus.OK)
   async forgotPassword(
     @Body(new ZodValidationPipe(forgotPasswordSchema)) dto: ForgotPasswordDto,
-  ): Promise<OtpSendResponse> {
+  ): Promise<ForgotPasswordResponse> {
     return this.memberAuthService.forgotPassword(dto);
   }
 
   /**
    * 8. POST /reset_password
-   * Verifies OTP, updates password with bcrypt 12 rounds, and revokes all active sessions.
+   * Verifies email reset token, updates password with bcrypt 12 rounds, and revokes all active sessions.
    */
   @Post('reset_password')
   @HttpCode(HttpStatus.OK)
