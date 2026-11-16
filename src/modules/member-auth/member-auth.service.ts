@@ -173,7 +173,7 @@ export class MemberAuthService {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: isProduction,
-      sameSite: 'lax',
+      sameSite: isProduction ? 'none' : 'lax', // 'none' required for cross-origin HTTPS requests
       maxAge: 7200 * 1000, // 2 hours in ms
       path: '/',
     });

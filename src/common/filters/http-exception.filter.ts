@@ -5,7 +5,7 @@ import {
   HttpException,
   Logger,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { handleDatabaseError } from '../utils/api-error.util';
 
 /**
@@ -24,6 +24,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    // Guarantee CORS headers are present even when exceptions or validation errors are thrown
+    const origin = request.headers?.origin;
+    if (origin && !response.getHeader('Access-Control-Allow-Origin')) {
+      response.setHeader('Access-Control-Allow-Origin', origin);
+      response.setHeader('Access-Control-Allow-Credentials', 'true');
+      response.setHeader('Vary', 'Origin');
+    }
 
     // 1. NestJS HttpException (Validation, Guard, NotFound, etc.)
     const isHttpException =

@@ -200,21 +200,32 @@ model RefreshToken {
 }
 
 model Dashboard {
-  Widget_id     String   @id @unique
-  Widget_name   String
-  Redirected_to String?
-  Placement     String?
-  Sequence      Int?
-  Territory     String?
-  Items         String[] @default([])
-  Product_Id    String?
-  Category_Id   String?
+  widgetId           String    @id @unique @map("widget_id")
+  widgetName         String    @map("widget_name")
+  widgetRedirectTo   String?   @map("widget_redirect_to")
+  placement          String?   @map("placement")
+  sequence           Int?      @map("sequence")
+  territory          String?   @map("territory")
+  items              Json      @default("[]") @map("items")
+  productId          String?   @map("product_id")
+  categoryId         String?   @map("category_id")
+  warehouseId        String?   @map("warehouse_id")
+  redirectCategoryId String?   @map("redirect_category_id")
+  redirectProductId  String?   @map("redirect_product_id")
+  effectiveFrom      DateTime? @map("effective_from")
+  effectiveTo        DateTime? @map("effective_to")
+  status             Boolean   @default(true) @map("status")
+  module             String?   @map("module")
+  createdBy          String?   @map("created_by")
+  updatedBy          String?   @map("updated_by")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  @@index([Placement])
-  @@index([Territory])
-  @@index([Sequence])
-  @@index([Product_Id])
-  @@index([Category_Id])
+  @@index([placement, sequence])
+  @@index([module, status])
+  @@index([territory])
+  @@index([warehouseId])
+  @@index([effectiveFrom, effectiveTo])
   @@map("dashboard")
 }
 

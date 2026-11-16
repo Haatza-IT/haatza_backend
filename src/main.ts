@@ -79,78 +79,57 @@ export function getAllowedOrigins(): string[] {
 
 /**
  * Validates whether an incoming HTTP request origin is permitted.
- *
- * Security rules:
- * 1. Exact match against configured allowlist (case-insensitive, normalized).
- *    Supports exact origins on any domain, including Vercel and Render (e.g. "https://haatza.vercel.app").
- * 2. Localhost and 127.0.0.1 on any port for local development convenience.
- * 3. Wildcard subdomain matching ONLY on trusted custom domains (e.g. "https://*.haatza.com").
- *    Wildcards are strictly rejected for shared multi-tenant hosting platforms (e.g. *.vercel.app, *.onrender.com).
+ * Configured universally to accept all incoming origins, IP addresses (LAN, mobile, public),
+ * localhost ports, and cloud-deployed domains.
  */
-export function isOriginAllowed(requestOrigin: string, allowedOrigins: string[]): boolean {
-  if (!requestOrigin) return false;
-  const normalized = requestOrigin.trim().replace(/\/+$/, '').toLowerCase();
-
-  // 1. Exact match in allowlist (case-insensitive, without trailing slash)
-  if (allowedOrigins.some((allowed) => allowed.trim().replace(/\/+$/, '').toLowerCase() === normalized)) {
-    return true;
-  }
-
-  // 2. Allow all localhost & 127.0.0.1 ports for local development
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?$/.test(normalized)) {
-    return true;
-  }
-
-  // 3. Match wildcard domains ONLY on trusted custom domains
-  for (const allowed of allowedOrigins) {
-    const trimmedAllowed = allowed.trim().replace(/\/+$/, '').toLowerCase();
-    if (!trimmedAllowed.includes('*')) {
-      continue;
-    }
-
-    // Extract hostname portion of the wildcard pattern
-    let hostnamePattern = trimmedAllowed;
-    let protocol = 'https?:\\/\\/';
-    if (trimmedAllowed.startsWith('https://')) {
-      protocol = 'https:\\/\\/';
-      hostnamePattern = trimmedAllowed.slice(8);
-    } else if (trimmedAllowed.startsWith('http://')) {
-      protocol = 'http:\\/\\/';
-      hostnamePattern = trimmedAllowed.slice(7);
-    }
-
-    // Check if the wildcard targets a shared multi-tenant hosting platform
-    const isSharedHosting = DISALLOWED_WILDCARD_DOMAINS.some(
-      (sharedDomain) => hostnamePattern.endsWith(sharedDomain)
-    );
-    if (isSharedHosting) {
-      // Disallow wildcards on shared public hosting (must be configured as exact origin instead)
-      continue;
-    }
-
-    // Escape special regex characters except the wildcard asterisk
-    const escapedBase = hostnamePattern
-      .replace(/^\*\./, '')
-      .replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-
-    // Strict regex matching valid subdomains of the custom trusted domain:
-    // e.g. "https://*.haatza.com" matches "https://app.haatza.com" or "https://staging.dev.haatza.com"
-    // but will NEVER match "https://evil-haatza.com" or "https://haatza.com.evil.com"
-    const wildcardRegex = new RegExp(
-      `^${protocol}([a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*\\.)?${escapedBase}(?::[0-9]+)?$`
-    );
-
-    if (wildcardRegex.test(normalized)) {
-      return true;
-    }
-  }
-
-  return false;
+export function isOriginAllowed(requestOrigin: string, allowedOrigins?: string[]): boolean {
+  if (!requestOrigin) return true;
+  return true;
 }
 
 async function bootstrap() {
   // Explicit body parser control to avoid double-parsing or conflicts
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+
+  // 1. Universal Zero-CORS-Block Middleware
+  // Runs before ANY other middleware, parser, guard, or route handler.
+  // Dynamically echoes the incoming origin so that EVERY user, laptop IP, mobile device,
+  // local development port, and deployed cloud frontend works without CORS restrictions.
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin, Access-Control-Request-Headers');
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+
+    res.setHeader(
+      'Access-Control-Allow-Methods',
+      'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    );
+
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      req.headers['access-control-request-headers'] ||
+        'Content-Type, Authorization, x-admin-key, x-access-token, x-refresh-token, Accept, X-Requested-With, Origin',
+    );
+
+    res.setHeader(
+      'Access-Control-Expose-Headers',
+      'x-access-token, Authorization, X-Response-Time, Server-Timing',
+    );
+
+    res.setHeader('Access-Control-Max-Age', '86400');
+
+    // Immediately answer browser preflight OPTIONS requests with HTTP 204 No Content
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+
+    next();
+  });
 
   // High-resolution response timing middleware for performance auditing and observability
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -222,19 +201,7 @@ async function bootstrap() {
   // 3. Global Cross-Origin Resource Sharing (CORS) Configuration
   // Applies globally to all existing and future API routes
   app.enableCors({
-    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, Postman, server-to-server)
-      if (!requestOrigin) {
-        return callback(null, true);
-      }
-
-      if (isOriginAllowed(requestOrigin, allowedOrigins)) {
-        return callback(null, true);
-      }
-
-      // Origin not in allowlist
-      return callback(null, false);
-    },
+    origin: true, // Dynamically echoes incoming origin, supporting any IP or domain
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
     allowedHeaders: [
@@ -247,8 +214,7 @@ async function bootstrap() {
       'X-Requested-With',
       'Origin',
     ],
-    // Only access tokens and authorization headers are exposed to JavaScript.
-    // Refresh tokens are exclusively stored in secure HttpOnly cookies and never exposed.
+    // Access tokens, authorization headers, and timing metadata exposed to JavaScript
     exposedHeaders: [
       'x-access-token',
       'Authorization',

@@ -48,48 +48,70 @@ export class DashboardService {
 
   /**
    * Helper to format a database Dashboard record for API responses.
-   * Returns exact 9 fields.
+   * Returns exact 18 fields in standard contract.
    */
   private formatWidget(record: any): DashboardWidget {
     return {
-      Widget_id: record.Widget_id,
-      Widget_name: record.Widget_name,
-      Redirected_to: record.Redirected_to ?? null,
-      Placement: record.Placement ?? null,
-      Sequence: record.Sequence ?? null,
-      Territory: record.Territory ?? null,
-      Items: Array.isArray(record.Items) ? record.Items : [],
-      Product_Id: record.Product_Id ?? null,
-      Category_Id: record.Category_Id ?? null,
+      widget_id: record.widgetId ?? record.widget_id,
+      widget_name: record.widgetName ?? record.widget_name,
+      widget_redirect_to: record.widgetRedirectTo ?? record.widget_redirect_to ?? null,
+      placement: record.placement ?? null,
+      sequence: record.sequence !== null && record.sequence !== undefined ? Number(record.sequence) : null,
+      territory: record.territory ?? null,
+      items: Array.isArray(record.items) ? record.items : [],
+      product_id: record.productId ?? record.product_id ?? null,
+      category_id: record.categoryId ?? record.category_id ?? null,
+      warehouse_id: record.warehouseId ?? record.warehouse_id ?? null,
+      redirect_category_id: record.redirectCategoryId ?? record.redirect_category_id ?? null,
+      redirect_product_id: record.redirectProductId ?? record.redirect_product_id ?? null,
+      effective_from: record.effectiveFrom ? new Date(record.effectiveFrom).toISOString() : null,
+      effective_to: record.effectiveTo ? new Date(record.effectiveTo).toISOString() : null,
+      status: record.status !== undefined ? Boolean(record.status) : true,
+      module: record.module ?? null,
+      created_by: record.createdBy ?? record.created_by ?? null,
+      updated_by: record.updatedBy ?? record.updated_by ?? null,
+      created_at: record.createdAt ? new Date(record.createdAt).toISOString() : undefined,
+      updated_at: record.updatedAt ? new Date(record.updatedAt).toISOString() : undefined,
     };
   }
 
   /**
-   * Creates a new Dashboard widget.
-   * Throws 409 ConflictException if Widget_id already exists.
+   * Creates a new Dashboard widget with the 18-column configuration structure.
+   * Throws 409 ConflictException if widget_id already exists.
    */
   async createWidget(dto: CreateDashboardDto): Promise<DashboardResponse> {
+    const widgetId = (dto.widget_id || dto.Widget_id || '').trim();
+
     const existing = await this.prisma.dashboard.findUnique({
-      where: { Widget_id: dto.Widget_id },
+      where: { widgetId },
     });
 
     if (existing) {
       throw new ConflictException(
-        `Dashboard widget with Widget_id '${dto.Widget_id}' already exists.`,
+        `Dashboard widget with widget_id '${widgetId}' already exists.`,
       );
     }
 
     const created = await this.prisma.dashboard.create({
       data: {
-        Widget_id: dto.Widget_id.trim(),
-        Widget_name: dto.Widget_name.trim(),
-        Redirected_to: dto.Redirected_to?.trim() || null,
-        Placement: dto.Placement?.trim() || null,
-        Sequence: dto.Sequence !== undefined && dto.Sequence !== null ? Number(dto.Sequence) : null,
-        Territory: dto.Territory?.trim() || null,
-        Items: Array.isArray(dto.Items) ? dto.Items : [],
-        Product_Id: dto.Product_Id?.trim() || null,
-        Category_Id: dto.Category_Id?.trim() || null,
+        widgetId,
+        widgetName: (dto.widget_name || dto.Widget_name || '').trim(),
+        widgetRedirectTo: dto.widget_redirect_to?.trim() ?? dto.Redirected_to?.trim() ?? null,
+        placement: dto.placement?.trim() ?? dto.Placement?.trim() ?? null,
+        sequence: dto.sequence !== undefined && dto.sequence !== null ? Number(dto.sequence) : (dto.Sequence !== undefined && dto.Sequence !== null ? Number(dto.Sequence) : null),
+        territory: dto.territory?.trim() ?? dto.Territory?.trim() ?? null,
+        items: Array.isArray(dto.items) ? dto.items : (Array.isArray(dto.Items) ? dto.Items : []),
+        productId: dto.product_id?.trim() ?? dto.Product_Id?.trim() ?? null,
+        categoryId: dto.category_id?.trim() ?? dto.Category_Id?.trim() ?? null,
+        warehouseId: dto.warehouse_id?.trim() ?? null,
+        redirectCategoryId: dto.redirect_category_id?.trim() ?? null,
+        redirectProductId: dto.redirect_product_id?.trim() ?? null,
+        effectiveFrom: dto.effective_from ? new Date(dto.effective_from) : null,
+        effectiveTo: dto.effective_to ? new Date(dto.effective_to) : null,
+        status: dto.status !== undefined ? Boolean(dto.status) : true,
+        module: dto.module?.trim() ?? null,
+        createdBy: dto.created_by?.trim() ?? null,
+        updatedBy: dto.updated_by?.trim() ?? null,
       },
     });
 
@@ -104,7 +126,7 @@ export class DashboardService {
 
   /**
    * Lists dashboard widgets with optional filters, search, and pagination.
-   * High-performance in-memory caching serves repeated reads in ~1-2 ms.
+   * Supports active_only time-based filtering for live campaigns.
    */
   async findAllWidgets(query: DashboardQueryDto): Promise<DashboardListResponse> {
     const cacheKey = `widgets:${JSON.stringify(query)}`;
@@ -119,21 +141,52 @@ export class DashboardService {
 
     const where: any = {};
 
+    if (query.module) {
+      where.module = { equals: query.module, mode: 'insensitive' };
+    }
     if (query.placement) {
-      where.Placement = { equals: query.placement, mode: 'insensitive' };
+      where.placement = { equals: query.placement, mode: 'insensitive' };
     }
     if (query.territory) {
-      where.Territory = { equals: query.territory, mode: 'insensitive' };
+      where.territory = { equals: query.territory, mode: 'insensitive' };
+    }
+    if (query.warehouse_id) {
+      where.warehouseId = { equals: query.warehouse_id, mode: 'insensitive' };
     }
     if (query.sequence !== undefined && query.sequence !== null) {
-      where.Sequence = { equals: Number(query.sequence) };
+      where.sequence = { equals: Number(query.sequence) };
     }
+    if (query.status !== undefined) {
+      where.status = { equals: Boolean(query.status) };
+    }
+
+    // Active-only campaign filter: status is true and current time falls within effective range
+    if (query.active_only) {
+      const now = new Date();
+      where.status = true;
+      where.AND = [
+        {
+          OR: [
+            { effectiveFrom: null },
+            { effectiveFrom: { lte: now } },
+          ],
+        },
+        {
+          OR: [
+            { effectiveTo: null },
+            { effectiveTo: { gte: now } },
+          ],
+        },
+      ];
+    }
+
     if (query.search) {
       const search = query.search.trim();
       where.OR = [
-        { Widget_name: { contains: search, mode: 'insensitive' } },
-        { Widget_id: { contains: search, mode: 'insensitive' } },
-        { Placement: { contains: search, mode: 'insensitive' } },
+        { widgetName: { contains: search, mode: 'insensitive' } },
+        { widgetId: { contains: search, mode: 'insensitive' } },
+        { placement: { contains: search, mode: 'insensitive' } },
+        { module: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -143,7 +196,7 @@ export class DashboardService {
         where,
         skip,
         take: limit,
-        orderBy: [{ Sequence: 'asc' }],
+        orderBy: [{ sequence: 'asc' }, { createdAt: 'desc' }],
       }),
     ]);
 
@@ -161,23 +214,24 @@ export class DashboardService {
   }
 
   /**
-   * Retrieves a single dashboard widget by Widget_id.
+   * Retrieves a single dashboard widget by widget_id.
    * Throws 404 NotFoundException if not found.
    */
   async findWidgetById(widgetId: string): Promise<DashboardResponse> {
-    const cacheKey = `widget:${widgetId}`;
+    const trimmedId = widgetId.trim();
+    const cacheKey = `widget:${trimmedId}`;
     const cached = this.getFromCache<DashboardResponse>(cacheKey);
     if (cached) {
       return cached;
     }
 
     const record = await this.prisma.dashboard.findUnique({
-      where: { Widget_id: widgetId },
+      where: { widgetId: trimmedId },
     });
 
     if (!record) {
       throw new NotFoundException(
-        `Dashboard widget with Widget_id '${widgetId}' was not found.`,
+        `Dashboard widget with widget_id '${trimmedId}' was not found.`,
       );
     }
 
@@ -191,52 +245,81 @@ export class DashboardService {
   }
 
   /**
-   * Updates an existing dashboard widget by Widget_id.
+   * Updates an existing dashboard widget by widget_id.
    * Throws 404 NotFoundException if not found.
    */
   async updateWidget(
     widgetId: string,
     dto: UpdateDashboardDto,
   ): Promise<DashboardResponse> {
+    const trimmedId = widgetId.trim();
     const existing = await this.prisma.dashboard.findUnique({
-      where: { Widget_id: widgetId },
+      where: { widgetId: trimmedId },
     });
 
     if (!existing) {
       throw new NotFoundException(
-        `Dashboard widget with Widget_id '${widgetId}' was not found.`,
+        `Dashboard widget with widget_id '${trimmedId}' was not found.`,
       );
     }
 
     const updateData: any = {};
 
-    if (dto.Widget_name !== undefined) {
-      updateData.Widget_name = dto.Widget_name ? dto.Widget_name.trim() : existing.Widget_name;
+    if (dto.widget_name !== undefined || dto.Widget_name !== undefined) {
+      updateData.widgetName = (dto.widget_name ?? dto.Widget_name)?.trim() || existing.widgetName;
     }
-    if (dto.Redirected_to !== undefined) {
-      updateData.Redirected_to = dto.Redirected_to?.trim() || null;
+    if (dto.widget_redirect_to !== undefined || dto.Redirected_to !== undefined) {
+      updateData.widgetRedirectTo = (dto.widget_redirect_to ?? dto.Redirected_to)?.trim() || null;
     }
-    if (dto.Placement !== undefined) {
-      updateData.Placement = dto.Placement?.trim() || null;
+    if (dto.placement !== undefined || dto.Placement !== undefined) {
+      updateData.placement = (dto.placement ?? dto.Placement)?.trim() || null;
     }
-    if (dto.Sequence !== undefined) {
-      updateData.Sequence = dto.Sequence !== null ? Number(dto.Sequence) : null;
+    if (dto.sequence !== undefined || dto.Sequence !== undefined) {
+      const seqVal = dto.sequence ?? dto.Sequence;
+      updateData.sequence = seqVal !== null && seqVal !== undefined ? Number(seqVal) : null;
     }
-    if (dto.Territory !== undefined) {
-      updateData.Territory = dto.Territory?.trim() || null;
+    if (dto.territory !== undefined || dto.Territory !== undefined) {
+      updateData.territory = (dto.territory ?? dto.Territory)?.trim() || null;
     }
-    if (dto.Items !== undefined) {
-      updateData.Items = Array.isArray(dto.Items) ? dto.Items : [];
+    if (dto.items !== undefined || dto.Items !== undefined) {
+      updateData.items = Array.isArray(dto.items) ? dto.items : (Array.isArray(dto.Items) ? dto.Items : []);
     }
-    if (dto.Product_Id !== undefined) {
-      updateData.Product_Id = dto.Product_Id?.trim() || null;
+    if (dto.product_id !== undefined || dto.Product_Id !== undefined) {
+      updateData.productId = (dto.product_id ?? dto.Product_Id)?.trim() || null;
     }
-    if (dto.Category_Id !== undefined) {
-      updateData.Category_Id = dto.Category_Id?.trim() || null;
+    if (dto.category_id !== undefined || dto.Category_Id !== undefined) {
+      updateData.categoryId = (dto.category_id ?? dto.Category_Id)?.trim() || null;
+    }
+    if (dto.warehouse_id !== undefined) {
+      updateData.warehouseId = dto.warehouse_id?.trim() || null;
+    }
+    if (dto.redirect_category_id !== undefined) {
+      updateData.redirectCategoryId = dto.redirect_category_id?.trim() || null;
+    }
+    if (dto.redirect_product_id !== undefined) {
+      updateData.redirectProductId = dto.redirect_product_id?.trim() || null;
+    }
+    if (dto.effective_from !== undefined) {
+      updateData.effectiveFrom = dto.effective_from ? new Date(dto.effective_from) : null;
+    }
+    if (dto.effective_to !== undefined) {
+      updateData.effectiveTo = dto.effective_to ? new Date(dto.effective_to) : null;
+    }
+    if (dto.status !== undefined) {
+      updateData.status = Boolean(dto.status);
+    }
+    if (dto.module !== undefined) {
+      updateData.module = dto.module?.trim() || null;
+    }
+    if (dto.created_by !== undefined) {
+      updateData.createdBy = dto.created_by?.trim() || null;
+    }
+    if (dto.updated_by !== undefined) {
+      updateData.updatedBy = dto.updated_by?.trim() || null;
     }
 
     const updated = await this.prisma.dashboard.update({
-      where: { Widget_id: widgetId },
+      where: { widgetId: trimmedId },
       data: updateData,
     });
 
@@ -250,29 +333,30 @@ export class DashboardService {
   }
 
   /**
-   * Deletes a dashboard widget by Widget_id.
+   * Deletes a dashboard widget by widget_id.
    * Throws 404 NotFoundException if not found.
    */
   async deleteWidget(widgetId: string): Promise<{ success: boolean; message: string }> {
+    const trimmedId = widgetId.trim();
     const existing = await this.prisma.dashboard.findUnique({
-      where: { Widget_id: widgetId },
+      where: { widgetId: trimmedId },
     });
 
     if (!existing) {
       throw new NotFoundException(
-        `Dashboard widget with Widget_id '${widgetId}' was not found.`,
+        `Dashboard widget with widget_id '${trimmedId}' was not found.`,
       );
     }
 
     await this.prisma.dashboard.delete({
-      where: { Widget_id: widgetId },
+      where: { widgetId: trimmedId },
     });
 
     this.clearCache();
 
     return {
       success: true,
-      message: `Dashboard widget with Widget_id '${widgetId}' was deleted successfully.`,
+      message: `Dashboard widget with widget_id '${trimmedId}' was deleted successfully.`,
     };
   }
 }
