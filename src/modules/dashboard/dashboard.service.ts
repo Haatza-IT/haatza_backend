@@ -2,9 +2,12 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { DashboardResolverService } from './dashboard-resolver.service';
 import type {
   CreateDashboardDto,
   UpdateDashboardDto,
@@ -12,16 +15,21 @@ import type {
   DashboardResponse,
   DashboardListResponse,
   DashboardWidget,
+  CustomerDashboardResponse,
+  ResolvedWidget,
 } from './dashboard.types';
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
   private readonly cache = new Map<string, { data: any; expiresAt: number }>();
   private readonly CACHE_TTL_MS = 30000; // 30 seconds
 
   constructor(
     @Inject(PrismaService)
     private readonly prisma: PrismaService,
+    @Inject(DashboardResolverService)
+    private readonly resolver: DashboardResolverService,
   ) {}
 
   private getFromCache<T>(key: string): T | null {
@@ -73,6 +81,444 @@ export class DashboardService {
       created_at: record.createdAt ? new Date(record.createdAt).toISOString() : undefined,
       updated_at: record.updatedAt ? new Date(record.updatedAt).toISOString() : undefined,
     };
+  }
+
+  /**
+   * Customer Dashboard: Fetches active widgets for the requested module (SHOPPING or LITE),
+   * sorted by sequence, and populates live product, category, and banner items.
+   */
+  async getCustomerDashboard(query: DashboardQueryDto): Promise<CustomerDashboardResponse> {
+    const rawModule = (query.module || '').trim();
+    if (!rawModule) {
+      throw new BadRequestException(
+        "The 'module' query parameter is required. Allowed values: 'SHOPPING', 'LITE'.",
+      );
+    }
+
+    const normalizedModule = rawModule.toUpperCase();
+    if (normalizedModule !== 'SHOPPING' && normalizedModule !== 'LITE') {
+      throw new BadRequestException(
+        `Invalid module '${rawModule}'. Allowed values: 'SHOPPING', 'LITE'.`,
+      );
+    }
+
+    const placementFilter = (query.placement || 'HOME').trim().toUpperCase();
+    const territoryFilter = (query.territory || 'ALL').trim().toUpperCase();
+    const warehouseIdFilter = query.warehouse_id?.trim() || null;
+
+    const cacheKey = `customer_dashboard:${normalizedModule}:${placementFilter}:${territoryFilter}:${warehouseIdFilter || 'any'}`;
+    const cached = this.getFromCache<CustomerDashboardResponse>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Ensure default widget configurations exist in database if count is 0
+    await this.ensureDefaultWidgets(normalizedModule);
+
+    // Build filter for active, currently-effective widgets
+    const now = new Date();
+    const where: any = {
+      module: { equals: normalizedModule, mode: 'insensitive' },
+      status: true,
+      AND: [
+        {
+          OR: [
+            { effectiveFrom: null },
+            { effectiveFrom: { lte: now } },
+          ],
+        },
+        {
+          OR: [
+            { effectiveTo: null },
+            { effectiveTo: { gte: now } },
+          ],
+        },
+      ],
+    };
+
+    if (placementFilter && placementFilter !== 'ALL') {
+      where.OR = [
+        { placement: null },
+        { placement: { equals: placementFilter, mode: 'insensitive' } },
+      ];
+    }
+
+    if (territoryFilter && territoryFilter !== 'ALL') {
+      where.territory = { in: [territoryFilter, 'ALL'] };
+    }
+
+    if (warehouseIdFilter) {
+      where.OR = [
+        { warehouseId: null },
+        { warehouseId: warehouseIdFilter },
+      ];
+    }
+
+    // Fetch configured widgets from database ordered by sequence
+    const widgetRecords = await this.prisma.dashboard.findMany({
+      where,
+      orderBy: [{ sequence: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    // Resolve live items for each widget via DashboardResolverService
+    const resolvedWidgets: ResolvedWidget[] = await Promise.all(
+      widgetRecords.map((widgetRecord) =>
+        this.resolver.resolveWidget(widgetRecord, {
+          territory: territoryFilter,
+          warehouse_id: warehouseIdFilter || undefined,
+        }),
+      ),
+    );
+
+    const response: CustomerDashboardResponse = {
+      success: true,
+      module: normalizedModule as 'SHOPPING' | 'LITE',
+      placement: placementFilter,
+      territory: territoryFilter,
+      total_widgets: resolvedWidgets.length,
+      widgets: resolvedWidgets,
+      data: resolvedWidgets, // dual-property compatibility
+    };
+
+    this.setInCache(cacheKey, response);
+    return response;
+  }
+
+  /**
+   * Automatically initializes default widget configurations if none exist for the module.
+   */
+  async ensureDefaultWidgets(moduleName?: string): Promise<void> {
+    const modules = moduleName ? [moduleName.toUpperCase()] : ['SHOPPING', 'LITE'];
+
+    for (const mod of modules) {
+      const count = await this.prisma.dashboard.count({
+        where: { module: { equals: mod, mode: 'insensitive' } },
+      });
+
+      if (count === 0) {
+        this.logger.log(`No dashboard widgets found for module '${mod}'. Seeding default widgets...`);
+        await this.seedDefaultWidgets(mod);
+      }
+    }
+  }
+
+  /**
+   * Seeds the 16 Shopping widgets or 7 Lite widgets into the PostgreSQL dashboard table.
+   */
+  async seedDefaultWidgets(targetModule?: string): Promise<number> {
+    const shoppingWidgets = [
+      {
+        widgetId: '10000000-0000-4000-8000-000000000001',
+        widgetName: 'Hero Banner',
+        widgetRedirectTo: '/offers/festive-sale',
+        placement: 'HOME',
+        sequence: 1,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: this.resolver.getDefaultBannersForWidget('Hero Banner', 'SHOPPING'),
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000002',
+        widgetName: 'Offers Banner',
+        widgetRedirectTo: '/offers',
+        placement: 'HOME',
+        sequence: 2,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: this.resolver.getDefaultBannersForWidget('Offers Banner', 'SHOPPING'),
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000003',
+        widgetName: 'Top Categories',
+        widgetRedirectTo: '/categories',
+        placement: 'HOME',
+        sequence: 3,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000004',
+        widgetName: 'Suggested for You',
+        widgetRedirectTo: '/recommendations',
+        placement: 'HOME',
+        sequence: 4,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000005',
+        widgetName: 'Promo Banners',
+        widgetRedirectTo: '/promotions',
+        placement: 'HOME',
+        sequence: 5,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: this.resolver.getDefaultBannersForWidget('Promo Banners', 'SHOPPING'),
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000006',
+        widgetName: 'Liked By You',
+        widgetRedirectTo: '/wishlist',
+        placement: 'HOME',
+        sequence: 6,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000007',
+        widgetName: 'Recently Viewed By You',
+        widgetRedirectTo: '/history',
+        placement: 'HOME',
+        sequence: 7,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000008',
+        widgetName: 'Banner for 49rs, trending fashion, best seller favourites and big deals',
+        widgetRedirectTo: '/promotions/combo',
+        placement: 'HOME',
+        sequence: 8,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: this.resolver.getDefaultBannersForWidget('Banner for 49rs, trending fashion, best seller favourites and big deals', 'SHOPPING'),
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000009',
+        widgetName: 'Trending Fashion',
+        widgetRedirectTo: '/categories/fashion',
+        placement: 'HOME',
+        sequence: 9,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        categoryId: 'f0000000-0000-4000-8000-000000000001',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000010',
+        widgetName: 'Deals of the Day',
+        widgetRedirectTo: '/deals',
+        placement: 'HOME',
+        sequence: 10,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000011',
+        widgetName: '49rs banner',
+        widgetRedirectTo: '/store/49',
+        placement: 'HOME',
+        sequence: 11,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: this.resolver.getDefaultBannersForWidget('49rs banner', 'SHOPPING'),
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000012',
+        widgetName: '₹49 Store',
+        widgetRedirectTo: '/store/49',
+        placement: 'HOME',
+        sequence: 12,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000013',
+        widgetName: 'Hurry! Deals Ending Soon',
+        widgetRedirectTo: '/deals/ending-soon',
+        placement: 'HOME',
+        sequence: 13,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000014',
+        widgetName: 'Best Seller Favourites',
+        widgetRedirectTo: '/bestsellers',
+        placement: 'HOME',
+        sequence: 14,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000015',
+        widgetName: 'Fresh New Arrivals',
+        widgetRedirectTo: '/new-arrivals',
+        placement: 'HOME',
+        sequence: 15,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '10000000-0000-4000-8000-000000000016',
+        widgetName: 'More to Explore',
+        widgetRedirectTo: '/explore',
+        placement: 'HOME',
+        sequence: 16,
+        territory: 'ALL',
+        module: 'SHOPPING',
+        status: true,
+        items: [],
+      },
+    ];
+
+    const liteWidgets = [
+      {
+        widgetId: '20000000-0000-4000-8000-000000000001',
+        widgetName: 'Hero Banner',
+        widgetRedirectTo: '/lite/offers',
+        placement: 'HOME',
+        sequence: 1,
+        territory: 'ALL',
+        module: 'LITE',
+        status: true,
+        items: this.resolver.getDefaultBannersForWidget('Hero Banner', 'LITE'),
+      },
+      {
+        widgetId: '20000000-0000-4000-8000-000000000002',
+        widgetName: 'Everyday Essentials',
+        widgetRedirectTo: '/lite/category/grocery',
+        placement: 'HOME',
+        sequence: 2,
+        territory: 'ALL',
+        module: 'LITE',
+        categoryId: 'g0000000-0000-4000-8000-000000000004',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '20000000-0000-4000-8000-000000000003',
+        widgetName: 'Live Automated Dispatch Belt',
+        widgetRedirectTo: '/lite/live-dispatch',
+        placement: 'HOME',
+        sequence: 3,
+        territory: 'ALL',
+        module: 'LITE',
+        status: true,
+        items: this.resolver.getDefaultBannersForWidget('Live Automated Dispatch Belt', 'LITE'),
+      },
+      {
+        widgetId: '20000000-0000-4000-8000-000000000004',
+        widgetName: 'Promo Banner',
+        widgetRedirectTo: '/lite/promotions',
+        placement: 'HOME',
+        sequence: 4,
+        territory: 'ALL',
+        module: 'LITE',
+        status: true,
+        items: this.resolver.getDefaultBannersForWidget('Promo Banner', 'LITE'),
+      },
+      {
+        widgetId: '20000000-0000-4000-8000-000000000005',
+        widgetName: 'Offer Banner',
+        widgetRedirectTo: '/lite/offers',
+        placement: 'HOME',
+        sequence: 5,
+        territory: 'ALL',
+        module: 'LITE',
+        status: true,
+        items: this.resolver.getDefaultBannersForWidget('Offer Banner', 'LITE'),
+      },
+      {
+        widgetId: '20000000-0000-4000-8000-000000000006',
+        widgetName: 'Fresh Fruits and Daily Greens',
+        widgetRedirectTo: '/lite/category/fruits-greens',
+        placement: 'HOME',
+        sequence: 6,
+        territory: 'ALL',
+        module: 'LITE',
+        categoryId: 'g0000000-0000-4000-8000-000000000004',
+        status: true,
+        items: [],
+      },
+      {
+        widgetId: '20000000-0000-4000-8000-000000000007',
+        widgetName: 'Household Cleaning and Hygiene',
+        widgetRedirectTo: '/lite/category/cleaning',
+        placement: 'HOME',
+        sequence: 7,
+        territory: 'ALL',
+        module: 'LITE',
+        status: true,
+        items: [],
+      },
+    ];
+
+    let widgetsToSeed: any[] = [];
+    const normalizedMod = targetModule?.toUpperCase();
+
+    if (normalizedMod === 'SHOPPING') {
+      widgetsToSeed = shoppingWidgets;
+    } else if (normalizedMod === 'LITE') {
+      widgetsToSeed = liteWidgets;
+    } else {
+      widgetsToSeed = [...shoppingWidgets, ...liteWidgets];
+    }
+
+    let insertedCount = 0;
+    const now = new Date();
+
+    for (const w of widgetsToSeed) {
+      await this.prisma.dashboard.upsert({
+        where: { widgetId: w.widgetId },
+        create: {
+          widgetId: w.widgetId,
+          widgetName: w.widgetName,
+          widgetRedirectTo: w.widgetRedirectTo,
+          placement: w.placement,
+          sequence: w.sequence,
+          territory: w.territory,
+          module: w.module,
+          items: w.items,
+          categoryId: w.categoryId ?? null,
+          productId: null,
+          warehouseId: null,
+          redirectCategoryId: null,
+          redirectProductId: null,
+          effectiveFrom: now,
+          effectiveTo: null,
+          status: w.status,
+          createdBy: 'SYSTEM_INIT',
+          updatedBy: 'SYSTEM_INIT',
+        },
+        update: {
+          widgetName: w.widgetName,
+          sequence: w.sequence,
+          module: w.module,
+          placement: w.placement,
+          status: w.status,
+        },
+      });
+      insertedCount++;
+    }
+
+    this.clearCache();
+    this.logger.log(`Seeded/updated ${insertedCount} widgets into dashboard table.`);
+    return insertedCount;
   }
 
   /**

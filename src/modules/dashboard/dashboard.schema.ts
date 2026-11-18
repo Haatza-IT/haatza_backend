@@ -220,6 +220,12 @@ export const dashboardQuerySchema = z.object({
     .transform((v) => v.toLowerCase() === 'true' || v === '1')
     .optional(),
   search: z.string().trim().optional(),
+  raw: z
+    .union([
+      z.boolean(),
+      z.string().transform((v) => v.toLowerCase() === 'true' || v === '1'),
+    ])
+    .optional(),
 });
 
 export type DashboardQueryInput = z.infer<typeof dashboardQuerySchema>;
