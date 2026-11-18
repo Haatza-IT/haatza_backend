@@ -1,6 +1,7 @@
 /**
  * Dashboard Types and DTO Interfaces
  * Supports the 18-column widget configuration architecture with JSONB items.
+ * Guaranteed zero null values across all customer responses.
  */
 
 export type RedirectType = 'CATEGORY' | 'PRODUCT' | 'CAMPAIGN' | 'EXTERNAL';
@@ -15,41 +16,89 @@ export type WidgetType =
 export interface BannerItem {
   id: string;
   title: string;
-  subtitle?: string | null;
-  badge?: string | null;
-  image_url: string;
-  button_text?: string | null;
-  redirect_type: RedirectType;
-  redirect_url: string;
+  subtitle: string;
+  badge: string;
+  imageUrl: string;
+  image_url: string; // legacy alias
+  buttonText: string;
+  button_text: string; // legacy alias
+  redirectType: RedirectType;
+  redirect_type: RedirectType; // legacy alias
+  redirectUrl: string;
+  redirect_url: string; // legacy alias
 }
 
 export interface CategoryItem {
-  category_id: string;
-  category_name: string;
+  categoryId: string;
+  category_id: string; // legacy alias
+  categoryName: string;
+  category_name: string; // legacy alias
   slug: string;
-  category_image: string | null;
-  redirect_type: 'CATEGORY';
-  redirect_url: string;
+  categoryImage: string;
+  category_image: string; // legacy alias
+  redirectType: 'CATEGORY';
+  redirect_type: 'CATEGORY'; // legacy alias
+  redirectUrl: string;
+  redirect_url: string; // legacy alias
 }
 
 export interface ProductItem {
-  product_id: string;
-  product_name: string;
-  product_image: string | null;
-  category_id: string;
-  category_name: string | null;
-  subcategory_id: string | null;
-  subcategory_name: string | null;
-  brand: string | null;
+  productId: string;
+  product_id: string; // legacy alias
+  productName: string;
+  product_name: string; // legacy alias
+  description: string;
+  productImage: string;
+  product_image: string; // legacy alias
+  categoryId: string;
+  category_id: string; // legacy alias
+  categoryName: string;
+  category_name: string; // legacy alias
+  subcategoryId: string;
+  subcategory_id: string; // legacy alias
+  subcategoryName: string;
+  subcategory_name: string; // legacy alias
+  brand: string;
   price: number;
-  mrp: number | null;
+  mrp: number;
   discount: number;
-  onsale_price: number | null;
-  ribbon: string | null;
-  is_haatzalite: boolean;
-  haatza_verified: boolean;
-  redirect_type: 'PRODUCT';
-  redirect_url: string;
+  onSalePrice: number;
+  onsale_price: number; // legacy alias
+  currency: string;
+  isAddToCart: boolean;
+  ribbon: string;
+  isHaatzaLite: boolean;
+  is_haatzalite: boolean; // legacy alias
+  haatzaVerified: boolean;
+  haatza_verified: boolean; // legacy alias
+  redirectType: 'PRODUCT';
+  redirect_type: 'PRODUCT'; // legacy alias
+  redirectUrl: string;
+  redirect_url: string; // legacy alias
+
+  // Extended product card fields for frontend compatibility
+  id: string;
+  name: string;
+  mainImage: string;
+  productCoverImage: string;
+  sku: string;
+  shippingWeight: number;
+  status: boolean;
+  productOptions: any[];
+  productType: string;
+  manageVariants: boolean;
+  trackInventory: boolean;
+  variantPrice: number;
+  productSpecification: Record<string, string>;
+  influencerBranding: boolean;
+  activeAdd: boolean;
+  promotionalImages: string[];
+  images: string[];
+  rating: number;
+  reviewCount: number;
+  inStock: boolean;
+  stock: number;
+  discountPercentage: number;
 }
 
 export type ResolvedWidgetItem =
@@ -61,22 +110,22 @@ export type ResolvedWidgetItem =
 export interface DashboardWidget {
   widget_id: string;
   widget_name: string;
-  widget_redirect_to: string | null;
-  placement: string | null;
-  sequence: number | null;
-  territory: string | null;
+  widget_redirect_to: string;
+  placement: string;
+  sequence: number;
+  territory: string;
   items: any[];
-  product_id: string | null;
-  category_id: string | null;
-  warehouse_id: string | null;
-  redirect_category_id: string | null;
-  redirect_product_id: string | null;
-  effective_from: string | null;
-  effective_to: string | null;
+  product_id: string;
+  category_id: string;
+  warehouse_id: string;
+  redirect_category_id: string;
+  redirect_product_id: string;
+  effective_from?: string;
+  effective_to?: string;
   status: boolean;
-  module: string | null;
-  created_by: string | null;
-  updated_by: string | null;
+  module: string;
+  created_by: string;
+  updated_by: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -151,11 +200,15 @@ export interface DashboardQueryDto {
   module?: string;
   placement?: string;
   territory?: string;
+  warehouseId?: string;
   warehouse_id?: string;
+  categoryId?: string;
+  category_id?: string;
   sequence?: number | string;
   status?: boolean | string;
   active_only?: boolean | string;
   search?: string;
+  raw?: boolean;
 }
 
 export interface DashboardResponse {
@@ -177,18 +230,16 @@ export interface ResolvedWidget {
   widget_id: string; // W001 through W023
   widget_name: string;
   widget_type: WidgetType;
-  widget_redirect_to: string | null;
-  placement: string | null;
-  sequence: number | null;
-  territory: string | null;
-  module: string | null;
-  warehouse_id?: string | null;
-  category_id?: string | null;
-  product_id?: string | null;
-  redirect_category_id?: string | null;
-  redirect_product_id?: string | null;
-  effective_from: string | null;
-  effective_to: string | null;
+  widget_redirect_to: string;
+  placement: string;
+  sequence: number;
+  territory: string;
+  module: string;
+  warehouse_id: string;
+  category_id: string;
+  product_id: string;
+  redirect_category_id: string;
+  redirect_product_id: string;
   status: boolean;
   items: ResolvedWidgetItem[];
   total_items: number;
@@ -199,9 +250,10 @@ export interface ResolvedWidget {
 
 export interface CustomerDashboardResponse {
   success: boolean;
-  module: 'SHOPPING' | 'LITE';
+  module: string; // 'HAATZA' | 'LITE' | 'SHOPPING'
   placement: string;
-  territory?: string;
+  territory: string;
+  warehouseId: string;
   total_widgets: number;
   data: ResolvedWidget[];
   widgets: ResolvedWidget[];

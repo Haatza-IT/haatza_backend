@@ -207,7 +207,10 @@ export const dashboardQuerySchema = z.object({
   module: z.string().trim().optional(),
   placement: z.string().trim().optional(),
   territory: z.string().trim().optional(),
+  warehouseId: z.string().trim().optional(),
   warehouse_id: z.string().trim().optional(),
+  categoryId: z.string().trim().optional(),
+  category_id: z.string().trim().optional(),
   sequence: z.coerce.number().int().optional(),
   status: z
     .string()

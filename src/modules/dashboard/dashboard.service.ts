@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { DashboardResolverService } from './dashboard-resolver.service';
+import { resolveTerritory, isTerritoryMatch } from './territory.util';
 import type {
   CreateDashboardDto,
   UpdateDashboardDto,
@@ -55,6 +56,57 @@ export class DashboardService {
   }
 
   /**
+   * Recursive sanitizer that guarantees zero null/undefined values in customer API responses.
+   */
+  private sanitizeNulls<T>(obj: T): T {
+    if (obj === null || obj === undefined) {
+      return '' as any;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.sanitizeNulls(item)) as any;
+    }
+    if (typeof obj === 'object') {
+      const clean: Record<string, any> = {};
+      for (const [key, value] of Object.entries(obj as Record<string, any>)) {
+        if (value === null || value === undefined) {
+          if (
+            key === 'sequence' ||
+            key === 'price' ||
+            key === 'mrp' ||
+            key === 'discount' ||
+            key === 'onSalePrice' ||
+            key === 'onsale_price' ||
+            key === 'total_items' ||
+            key === 'total_widgets'
+          ) {
+            clean[key] = 0;
+          } else if (
+            key === 'status' ||
+            key === 'isAddToCart' ||
+            key === 'isHaatzaLite' ||
+            key === 'is_haatzalite' ||
+            key === 'haatzaVerified' ||
+            key === 'haatza_verified' ||
+            key === 'success'
+          ) {
+            clean[key] = false;
+          } else if (key === 'items' || key === 'data' || key === 'widgets') {
+            clean[key] = [];
+          } else {
+            clean[key] = '';
+          }
+        } else if (typeof value === 'object') {
+          clean[key] = this.sanitizeNulls(value);
+        } else {
+          clean[key] = value;
+        }
+      }
+      return clean as any;
+    }
+    return obj;
+  }
+
+  /**
    * Helper to format a database Dashboard record for API responses.
    * Returns exact 18 fields in standard contract.
    */
@@ -62,63 +114,84 @@ export class DashboardService {
     return {
       widget_id: record.widgetId ?? record.widget_id,
       widget_name: record.widgetName ?? record.widget_name,
-      widget_redirect_to: record.widgetRedirectTo ?? record.widget_redirect_to ?? null,
-      placement: record.placement ?? null,
-      sequence: record.sequence !== null && record.sequence !== undefined ? Number(record.sequence) : null,
-      territory: record.territory ?? null,
+      widget_redirect_to: record.widgetRedirectTo ?? record.widget_redirect_to ?? '',
+      placement: record.placement ?? 'HOME',
+      sequence: record.sequence !== null && record.sequence !== undefined ? Number(record.sequence) : 0,
+      territory: record.territory ?? 'ALL',
       items: Array.isArray(record.items) ? record.items : [],
-      product_id: record.productId ?? record.product_id ?? null,
-      category_id: record.categoryId ?? record.category_id ?? null,
-      warehouse_id: record.warehouseId ?? record.warehouse_id ?? null,
-      redirect_category_id: record.redirectCategoryId ?? record.redirect_category_id ?? null,
-      redirect_product_id: record.redirectProductId ?? record.redirect_product_id ?? null,
-      effective_from: record.effectiveFrom ? new Date(record.effectiveFrom).toISOString() : null,
-      effective_to: record.effectiveTo ? new Date(record.effectiveTo).toISOString() : null,
+      product_id: record.productId ?? record.product_id ?? '',
+      category_id: record.categoryId ?? record.category_id ?? '',
+      warehouse_id: record.warehouseId ?? record.warehouse_id ?? '',
+      redirect_category_id: record.redirectCategoryId ?? record.redirect_category_id ?? '',
+      redirect_product_id: record.redirectProductId ?? record.redirect_product_id ?? '',
+      effective_from: record.effectiveFrom ? new Date(record.effectiveFrom).toISOString() : '',
+      effective_to: record.effectiveTo ? new Date(record.effectiveTo).toISOString() : '',
       status: record.status !== undefined ? Boolean(record.status) : true,
-      module: record.module ?? null,
-      created_by: record.createdBy ?? record.created_by ?? null,
-      updated_by: record.updatedBy ?? record.updated_by ?? null,
+      module: record.module ?? 'HAATZA',
+      created_by: record.createdBy ?? record.created_by ?? '',
+      updated_by: record.updatedBy ?? record.updated_by ?? '',
       created_at: record.createdAt ? new Date(record.createdAt).toISOString() : undefined,
       updated_at: record.updatedAt ? new Date(record.updatedAt).toISOString() : undefined,
     };
   }
 
   /**
-   * Customer Dashboard: Fetches active widgets for the requested module (SHOPPING or LITE),
-   * sorted by sequence, and populates live product, category, and banner items.
+   * Customer Dashboard: Fetches active widgets for the requested module (HAATZA, SHOPPING, or LITE),
+   * sorted by sequence, and populates widgets purely from items JSONB in the dashboard table.
+   * Zero external queries to Product, Category, or Wishlist tables.
    */
   async getCustomerDashboard(query: DashboardQueryDto): Promise<CustomerDashboardResponse> {
     const rawModule = (query.module || '').trim();
     if (!rawModule) {
       throw new BadRequestException(
-        "The 'module' query parameter is required. Allowed values: 'SHOPPING', 'LITE'.",
+        "The 'module' query parameter is required. Allowed values: 'HAATZA', 'SHOPPING', 'LITE'.",
       );
     }
 
-    const normalizedModule = rawModule.toUpperCase();
-    if (normalizedModule !== 'SHOPPING' && normalizedModule !== 'LITE') {
+    const upperModule = rawModule.toUpperCase();
+    if (upperModule === 'SHOPPING') {
       throw new BadRequestException(
-        `Invalid module '${rawModule}'. Allowed values: 'SHOPPING', 'LITE'.`,
+        "The 'SHOPPING' module is no longer supported. Please use module='HAATZA' for HAATZA Shopping.",
       );
     }
+
+    if (upperModule !== 'HAATZA' && upperModule !== 'LITE') {
+      throw new BadRequestException(
+        `Invalid module '${rawModule}'. Supported values are 'HAATZA' and 'LITE'.`,
+      );
+    }
+
+    const responseModule = upperModule;
+    const dbModules = [upperModule];
 
     const placementFilter = (query.placement || 'HOME').trim().toUpperCase();
-    const territoryFilter = (query.territory || 'ALL').trim().toUpperCase();
-    const warehouseIdFilter = query.warehouse_id?.trim() || null;
+    const territoryFilter = (query.territory || '').trim();
+    const warehouseIdFilter = (query.warehouseId || query.warehouse_id || '').trim();
+    const categoryIdFilter = (query.categoryId || query.category_id || '').trim();
 
-    const cacheKey = `customer_dashboard:${normalizedModule}:${placementFilter}:${territoryFilter}:${warehouseIdFilter || 'any'}`;
+    // Territory validation: validate against the 28 states of India
+    if (territoryFilter && territoryFilter !== 'ALL') {
+      const resolved = resolveTerritory(territoryFilter);
+      if (!resolved) {
+        throw new BadRequestException(
+          `Invalid territory prefix '${territoryFilter}'. Territory must be a valid PIN-code prefix for one of the 28 states of India.`,
+        );
+      }
+    }
+
+    const cacheKey = `customer_dashboard:${responseModule}:${placementFilter}:${territoryFilter || 'ALL'}:${warehouseIdFilter || 'any'}:${categoryIdFilter || 'all'}`;
     const cached = this.getFromCache<CustomerDashboardResponse>(cacheKey);
     if (cached) {
       return cached;
     }
 
     // Ensure default widget configurations exist in database if count is 0
-    await this.ensureDefaultWidgets(normalizedModule);
+    await this.ensureDefaultWidgets(upperModule);
 
     // Build filter for active, currently-effective widgets
     const now = new Date();
     const where: any = {
-      module: { equals: normalizedModule, mode: 'insensitive' },
+      module: { equals: upperModule, mode: 'insensitive' },
       status: true,
       AND: [
         {
@@ -144,13 +217,14 @@ export class DashboardService {
     }
 
     if (territoryFilter && territoryFilter !== 'ALL') {
+      // 2-digit location prefix (e.g. '56' for Bengaluru territory) or 'ALL'
       where.territory = { in: [territoryFilter, 'ALL'] };
     }
 
     if (warehouseIdFilter) {
       where.OR = [
         { warehouseId: null },
-        { warehouseId: warehouseIdFilter },
+        { warehouseId: { in: [warehouseIdFilter, 'ALL'] } },
       ];
     }
 
@@ -160,37 +234,51 @@ export class DashboardService {
       orderBy: [{ sequence: 'asc' }, { createdAt: 'asc' }],
     });
 
-    // Resolve live items for each widget via DashboardResolverService
-    const resolvedWidgets: ResolvedWidget[] = await Promise.all(
-      widgetRecords.map((widgetRecord) =>
-        this.resolver.resolveWidget(widgetRecord, {
-          territory: territoryFilter,
-          warehouse_id: warehouseIdFilter || undefined,
-        }),
-      ),
+    // Resolve widget data purely in-memory from the items JSONB column
+    let resolvedWidgets: ResolvedWidget[] = widgetRecords.map((widgetRecord) =>
+      this.resolver.resolveWidget(widgetRecord, {
+        categoryId: categoryIdFilter,
+        territory: territoryFilter,
+        warehouseId: warehouseIdFilter,
+      }),
     );
+
+    // If categoryId filter is provided, filter widgets
+    if (categoryIdFilter) {
+      resolvedWidgets = resolvedWidgets.filter((w) => {
+        if (w.category_id && w.category_id === categoryIdFilter) return true;
+        if (w.widget_type === 'CATEGORY' || w.widget_type === 'PRODUCT_LIST') {
+          return w.items.length > 0;
+        }
+        return false;
+      });
+    }
 
     const response: CustomerDashboardResponse = {
       success: true,
-      module: normalizedModule as 'SHOPPING' | 'LITE',
+      module: responseModule,
       placement: placementFilter,
-      territory: territoryFilter,
+      territory: territoryFilter || 'ALL',
+      warehouseId: warehouseIdFilter,
       total_widgets: resolvedWidgets.length,
+      data: resolvedWidgets,
       widgets: resolvedWidgets,
-      data: resolvedWidgets, // dual-property compatibility
     };
 
-    this.setInCache(cacheKey, response);
-    return response;
+    const sanitized = this.sanitizeNulls(response);
+    sanitized.widgets = sanitized.data;
+    this.setInCache(cacheKey, sanitized);
+    return sanitized;
   }
 
   /**
    * Automatically initializes default widget configurations if none exist for the module.
    */
   async ensureDefaultWidgets(moduleName?: string): Promise<void> {
-    const modules = moduleName ? [moduleName.toUpperCase()] : ['SHOPPING', 'LITE'];
+    const raw = (moduleName || '').toUpperCase();
+    const modulesToCheck = raw === 'HAATZA' ? ['HAATZA'] : raw === 'LITE' ? ['LITE'] : ['HAATZA', 'LITE'];
 
-    for (const mod of modules) {
+    for (const mod of modulesToCheck) {
       const count = await this.prisma.dashboard.count({
         where: { module: { equals: mod, mode: 'insensitive' } },
       });
@@ -471,7 +559,7 @@ export class DashboardService {
     let widgetsToSeed: any[] = [];
     const normalizedMod = targetModule?.toUpperCase();
 
-    if (normalizedMod === 'SHOPPING') {
+    if (normalizedMod === 'HAATZA' || normalizedMod === 'SHOPPING') {
       widgetsToSeed = shoppingWidgets;
     } else if (normalizedMod === 'LITE') {
       widgetsToSeed = liteWidgets;
@@ -588,7 +676,12 @@ export class DashboardService {
     const where: any = {};
 
     if (query.module) {
-      where.module = { equals: query.module, mode: 'insensitive' };
+      const upper = query.module.toUpperCase();
+      if (upper === 'HAATZA' || upper === 'SHOPPING') {
+        where.module = { in: ['HAATZA', 'SHOPPING'], mode: 'insensitive' };
+      } else {
+        where.module = { equals: query.module, mode: 'insensitive' };
+      }
     }
     if (query.placement) {
       where.placement = { equals: query.placement, mode: 'insensitive' };
@@ -596,8 +689,13 @@ export class DashboardService {
     if (query.territory) {
       where.territory = { equals: query.territory, mode: 'insensitive' };
     }
-    if (query.warehouse_id) {
-      where.warehouseId = { equals: query.warehouse_id, mode: 'insensitive' };
+    const warehouseFilter = query.warehouseId || query.warehouse_id;
+    if (warehouseFilter) {
+      where.warehouseId = { equals: warehouseFilter, mode: 'insensitive' };
+    }
+    const categoryFilter = query.categoryId || query.category_id;
+    if (categoryFilter) {
+      where.categoryId = { equals: categoryFilter, mode: 'insensitive' };
     }
     if (query.sequence !== undefined && query.sequence !== null) {
       where.sequence = { equals: Number(query.sequence) };
