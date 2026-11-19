@@ -189,16 +189,20 @@ export class DashboardService {
       }),
     );
 
-    // If categoryId filter is provided, filter widgets
+    // If categoryId filter is provided, filter widgets while preserving layout structure:
+    // 1. BANNER widgets are layout-level promotional sections and must never be removed.
+    // 2. If a widget is explicitly dedicated to a different category, exclude it.
+    // 3. CATEGORY and PRODUCT_LIST widgets are preserved in the layout sequence even if their items array is empty.
     if (categoryIdFilter) {
       resolvedWidgets = resolvedWidgets.filter((w) => {
-        if (w.category_id && w.category_id === categoryIdFilter) return true;
-        if (w.widget_type === 'CATEGORY' || w.widget_type === 'PRODUCT_LIST') {
-          return w.items.length > 0;
-        }
-        return false;
+        if (w.widget_type === 'BANNER') return true;
+        if (w.category_id && w.category_id !== categoryIdFilter) return false;
+        return true;
       });
     }
+
+    // Deterministic ascending sequence ordering: strictly by sequence number ASC
+    resolvedWidgets.sort((a, b) => a.sequence - b.sequence);
 
     const response: CustomerDashboardResponse = {
       success: true,
