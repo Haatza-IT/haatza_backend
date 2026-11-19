@@ -623,7 +623,7 @@ export class DashboardService {
     }
 
     const page = query.page && query.page > 0 ? Number(query.page) : 1;
-    const limit = query.limit && query.limit > 0 ? Math.min(Number(query.limit), 100) : 20;
+    const limit = query.limit && query.limit > 0 ? Math.min(Number(query.limit), 100) : 50;
     const skip = (page - 1) * limit;
 
     const where: any = {};
@@ -681,7 +681,7 @@ export class DashboardService {
         where,
         skip,
         take: limit,
-        orderBy: [{ sequence: 'asc' }, { createdAt: 'desc' }],
+        orderBy: [{ module: 'asc' }, { sequence: 'asc' }, { widgetId: 'asc' }],
       }),
     ]);
 

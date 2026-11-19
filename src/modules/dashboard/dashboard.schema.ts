@@ -203,7 +203,7 @@ export type UpdateDashboardInput = z.infer<typeof updateDashboardSchema>;
  */
 export const dashboardQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  limit: z.coerce.number().int().positive().max(100).default(50),
   module: z.string().trim().optional(),
   placement: z.string().trim().optional(),
   territory: z.string().trim().optional(),
