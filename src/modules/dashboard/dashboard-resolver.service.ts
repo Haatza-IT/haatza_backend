@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import type {
   ResolvedWidget,
   WidgetType,
@@ -8,30 +8,64 @@ import type {
   ProductItem,
 } from './dashboard.types';
 
+/**
+ * Whitelist of strictly valid Dashboard Widget IDs (W001 to W023).
+ */
+export const VALID_WIDGET_IDS = new Set<string>(
+  Array.from({ length: 23 }, (_, i) => `W${String(i + 1).padStart(3, '0')}`),
+);
+
+/**
+ * Parses unknown input into a strict integer.
+ * Rejects floats, partial strings ("1abc", "1.5"), negatives, null, undefined, and non-numeric values.
+ */
+export function parseStrictInteger(val: unknown): number | null {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  if (!/^-?\d+$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
 @Injectable()
 export class DashboardResolverService {
   private readonly logger = new Logger(DashboardResolverService.name);
 
   /**
-   * Maps module and sequence to standard W001-W023 API identifier without altering database records.
-   * HAATZA: W001 - W016 (sequence 1 to 16)
-   * LITE: W017 - W023 (sequence 1 to 7 mapped to 17 to 23)
+   * Resolves widget identifier strictly to W001-W023.
+   * 1. If candidate ID is already in W001-W023, returns it directly.
+   * 2. Otherwise maps based on strict module and integer sequence:
+   *    - HAATZA: sequences 1..16 -> W001..W016
+   *    - LITE: sequences 1..7 -> W017..W023
+   * 3. If neither matches, throws BadRequestException. Never returns W000 or invalid IDs.
    */
   public mapWidgetId(
     module: string | null | undefined,
-    sequence: number | null | undefined,
-    fallbackId: string,
+    sequence: unknown,
+    candidateId?: string | null,
   ): string {
-    const mod = (module || '').toUpperCase();
-    const seq = sequence !== null && sequence !== undefined ? Number(sequence) : 0;
+    const trimmedId = candidateId ? String(candidateId).trim() : '';
+    if (VALID_WIDGET_IDS.has(trimmedId)) {
+      return trimmedId;
+    }
 
-    if (mod === 'HAATZA' && seq >= 1 && seq <= 16) {
-      return `W${String(seq).padStart(3, '0')}`;
+    const mod = (module || '').toUpperCase().trim();
+    const seq = parseStrictInteger(sequence);
+
+    if (seq !== null) {
+      if (mod === 'HAATZA' && seq >= 1 && seq <= 16) {
+        const mapped = `W${String(seq).padStart(3, '0')}`;
+        if (VALID_WIDGET_IDS.has(mapped)) return mapped;
+      }
+      if (mod === 'LITE' && seq >= 1 && seq <= 7) {
+        const mapped = `W${String(seq + 16).padStart(3, '0')}`;
+        if (VALID_WIDGET_IDS.has(mapped)) return mapped;
+      }
     }
-    if (mod === 'LITE' && seq >= 1 && seq <= 7) {
-      return `W${String(seq + 16).padStart(3, '0')}`;
-    }
-    return fallbackId || 'W000';
+
+    throw new BadRequestException(
+      `Invalid dashboard widget: ID "${trimmedId}" is not a recognized widget ID (W001-W023) and module "${mod}" / sequence "${sequence}" could not be mapped to an approved widget ID.`,
+    );
   }
 
   /**
@@ -226,9 +260,9 @@ export class DashboardResolverService {
     const rawName = String(widget.widgetName ?? widget.widget_name ?? '').trim();
     const normalizedName = rawName.toLowerCase();
     const mod = String(widget.module ?? 'HAATZA').toUpperCase();
-    const seq = widget.sequence !== null && widget.sequence !== undefined ? Number(widget.sequence) : 0;
-    const originalId = String(widget.widgetId ?? widget.widget_id ?? '');
-    const apiWidgetId = this.mapWidgetId(mod, seq, originalId);
+    const originalId = String(widget.widgetId ?? widget.widget_id ?? '').trim();
+    const seq = parseStrictInteger(widget.sequence) ?? 0;
+    const apiWidgetId = this.mapWidgetId(mod, widget.sequence, originalId);
     const isLite = mod === 'LITE';
 
     const baseWidget = {

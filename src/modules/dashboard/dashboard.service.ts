@@ -21,6 +21,13 @@ import type {
   ResolvedWidget,
 } from './dashboard.types';
 
+/**
+ * Perpetual expiry date representations for widgets that never expire.
+ * Stored as '2099-12-31 23:59:59+00'::timestamptz in PostgreSQL; serialized as '' in API responses.
+ */
+export const PERPETUAL_EXPIRY_ISO = '2099-12-31T23:59:59.000Z';
+export const PERPETUAL_EXPIRY_DATE = new Date(PERPETUAL_EXPIRY_ISO);
+
 @Injectable()
 export class DashboardService {
   private readonly logger = new Logger(DashboardService.name);
@@ -59,10 +66,15 @@ export class DashboardService {
   /**
    * Helper to format a database Dashboard record for API responses.
    * Returns exact 18 fields in standard contract with guaranteed non-null types.
+   * Perpetual expiry sentinel (2099-12-31T23:59:59.000Z) is serialized as '' (empty string).
    */
   private formatWidget(record: any): DashboardWidget {
     const rawItems = Array.isArray(record.items) ? record.items : [];
     const sanitizedItems = sanitizeNulls(rawItems);
+    const effectiveFromIso = record.effectiveFrom ? new Date(record.effectiveFrom).toISOString() : '';
+    const effectiveToIso = record.effectiveTo ? new Date(record.effectiveTo).toISOString() : '';
+    const effective_to = effectiveToIso === PERPETUAL_EXPIRY_ISO ? '' : effectiveToIso;
+
     return {
       widget_id: String(record.widgetId ?? record.widget_id ?? ''),
       widget_name: String(record.widgetName ?? record.widget_name ?? ''),
@@ -76,8 +88,8 @@ export class DashboardService {
       warehouse_id: String(record.warehouseId ?? record.warehouse_id ?? ''),
       redirect_category_id: String(record.redirectCategoryId ?? record.redirect_category_id ?? ''),
       redirect_product_id: String(record.redirectProductId ?? record.redirect_product_id ?? ''),
-      effective_from: record.effectiveFrom ? new Date(record.effectiveFrom).toISOString() : '',
-      effective_to: record.effectiveTo ? new Date(record.effectiveTo).toISOString() : '',
+      effective_from: effectiveFromIso,
+      effective_to,
       status: record.status !== undefined ? Boolean(record.status) : true,
       module: String(record.module ?? 'HAATZA'),
       created_by: String(record.createdBy ?? record.created_by ?? ''),
@@ -145,39 +157,21 @@ export class DashboardService {
     const where: any = {
       module: { equals: upperModule, mode: 'insensitive' },
       status: true,
-      AND: [
-        {
-          OR: [
-            { effectiveFrom: null },
-            { effectiveFrom: { lte: now } },
-          ],
-        },
-        {
-          OR: [
-            { effectiveTo: null },
-            { effectiveTo: { gte: now } },
-          ],
-        },
-      ],
+      effectiveFrom: { lte: now },
+      effectiveTo: { gte: now },
     };
 
     if (placementFilter && placementFilter !== 'ALL') {
-      where.OR = [
-        { placement: null },
-        { placement: { equals: placementFilter, mode: 'insensitive' } },
-      ];
+      where.placement = { in: [placementFilter, 'HOME', 'ALL', ''] };
     }
 
     if (territoryFilter && territoryFilter !== 'ALL') {
       // 2-digit location prefix (e.g. '56' for Bengaluru territory) or 'ALL'
-      where.territory = { in: [territoryFilter, 'ALL'] };
+      where.territory = { in: [territoryFilter, 'ALL', ''] };
     }
 
     if (warehouseIdFilter) {
-      where.OR = [
-        { warehouseId: null },
-        { warehouseId: { in: [warehouseIdFilter, 'ALL'] } },
-      ];
+      where.warehouseId = { in: [warehouseIdFilter, 'ALL', ''] };
     }
 
     // Fetch configured widgets from database ordered by sequence
@@ -248,179 +242,179 @@ export class DashboardService {
   async seedDefaultWidgets(targetModule?: string): Promise<number> {
     const shoppingWidgets = [
       {
-        widgetId: '10000000-0000-4000-8000-000000000001',
+        widgetId: 'W001',
         widgetName: 'Hero Banner',
         widgetRedirectTo: '/offers/festive-sale',
         placement: 'HOME',
         sequence: 1,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
-        items: this.resolver.getDefaultBannersForWidget('Hero Banner', 'SHOPPING'),
+        items: this.resolver.getDefaultBannersForWidget('Hero Banner', 'HAATZA'),
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000002',
+        widgetId: 'W002',
         widgetName: 'Offers Banner',
         widgetRedirectTo: '/offers',
         placement: 'HOME',
         sequence: 2,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
-        items: this.resolver.getDefaultBannersForWidget('Offers Banner', 'SHOPPING'),
+        items: this.resolver.getDefaultBannersForWidget('Offers Banner', 'HAATZA'),
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000003',
+        widgetId: 'W003',
         widgetName: 'Top Categories',
         widgetRedirectTo: '/categories',
         placement: 'HOME',
         sequence: 3,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000004',
+        widgetId: 'W004',
         widgetName: 'Suggested for You',
         widgetRedirectTo: '/recommendations',
         placement: 'HOME',
         sequence: 4,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000005',
+        widgetId: 'W005',
         widgetName: 'Promo Banners',
         widgetRedirectTo: '/promotions',
         placement: 'HOME',
         sequence: 5,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
-        items: this.resolver.getDefaultBannersForWidget('Promo Banners', 'SHOPPING'),
+        items: this.resolver.getDefaultBannersForWidget('Promo Banners', 'HAATZA'),
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000006',
+        widgetId: 'W006',
         widgetName: 'Liked By You',
         widgetRedirectTo: '/wishlist',
         placement: 'HOME',
         sequence: 6,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000007',
+        widgetId: 'W007',
         widgetName: 'Recently Viewed By You',
         widgetRedirectTo: '/history',
         placement: 'HOME',
         sequence: 7,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000008',
+        widgetId: 'W008',
         widgetName: 'Banner for 49rs, trending fashion, best seller favourites and big deals',
         widgetRedirectTo: '/promotions/combo',
         placement: 'HOME',
         sequence: 8,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
-        items: this.resolver.getDefaultBannersForWidget('Banner for 49rs, trending fashion, best seller favourites and big deals', 'SHOPPING'),
+        items: this.resolver.getDefaultBannersForWidget('Banner for 49rs, trending fashion, best seller favourites and big deals', 'HAATZA'),
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000009',
+        widgetId: 'W009',
         widgetName: 'Trending Fashion',
         widgetRedirectTo: '/categories/fashion',
         placement: 'HOME',
         sequence: 9,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         categoryId: 'f0000000-0000-4000-8000-000000000001',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000010',
+        widgetId: 'W010',
         widgetName: 'Deals of the Day',
         widgetRedirectTo: '/deals',
         placement: 'HOME',
         sequence: 10,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000011',
+        widgetId: 'W011',
         widgetName: '49rs banner',
         widgetRedirectTo: '/store/49',
         placement: 'HOME',
         sequence: 11,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
-        items: this.resolver.getDefaultBannersForWidget('49rs banner', 'SHOPPING'),
+        items: this.resolver.getDefaultBannersForWidget('49rs banner', 'HAATZA'),
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000012',
+        widgetId: 'W012',
         widgetName: '₹49 Store',
         widgetRedirectTo: '/store/49',
         placement: 'HOME',
         sequence: 12,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000013',
+        widgetId: 'W013',
         widgetName: 'Hurry! Deals Ending Soon',
         widgetRedirectTo: '/deals/ending-soon',
         placement: 'HOME',
         sequence: 13,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000014',
+        widgetId: 'W014',
         widgetName: 'Best Seller Favourites',
         widgetRedirectTo: '/bestsellers',
         placement: 'HOME',
         sequence: 14,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000015',
+        widgetId: 'W015',
         widgetName: 'Fresh New Arrivals',
         widgetRedirectTo: '/new-arrivals',
         placement: 'HOME',
         sequence: 15,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
       {
-        widgetId: '10000000-0000-4000-8000-000000000016',
+        widgetId: 'W016',
         widgetName: 'More to Explore',
         widgetRedirectTo: '/explore',
         placement: 'HOME',
         sequence: 16,
         territory: 'ALL',
-        module: 'SHOPPING',
+        module: 'HAATZA',
         status: true,
         items: [],
       },
@@ -428,7 +422,7 @@ export class DashboardService {
 
     const liteWidgets = [
       {
-        widgetId: '20000000-0000-4000-8000-000000000001',
+        widgetId: 'W017',
         widgetName: 'Hero Banner',
         widgetRedirectTo: '/lite/offers',
         placement: 'HOME',
@@ -439,7 +433,7 @@ export class DashboardService {
         items: this.resolver.getDefaultBannersForWidget('Hero Banner', 'LITE'),
       },
       {
-        widgetId: '20000000-0000-4000-8000-000000000002',
+        widgetId: 'W018',
         widgetName: 'Everyday Essentials',
         widgetRedirectTo: '/lite/category/grocery',
         placement: 'HOME',
@@ -451,7 +445,7 @@ export class DashboardService {
         items: [],
       },
       {
-        widgetId: '20000000-0000-4000-8000-000000000003',
+        widgetId: 'W019',
         widgetName: 'Live Automated Dispatch Belt',
         widgetRedirectTo: '/lite/live-dispatch',
         placement: 'HOME',
@@ -462,7 +456,7 @@ export class DashboardService {
         items: this.resolver.getDefaultBannersForWidget('Live Automated Dispatch Belt', 'LITE'),
       },
       {
-        widgetId: '20000000-0000-4000-8000-000000000004',
+        widgetId: 'W020',
         widgetName: 'Promo Banner',
         widgetRedirectTo: '/lite/promotions',
         placement: 'HOME',
@@ -473,7 +467,7 @@ export class DashboardService {
         items: this.resolver.getDefaultBannersForWidget('Promo Banner', 'LITE'),
       },
       {
-        widgetId: '20000000-0000-4000-8000-000000000005',
+        widgetId: 'W021',
         widgetName: 'Offer Banner',
         widgetRedirectTo: '/lite/offers',
         placement: 'HOME',
@@ -484,7 +478,7 @@ export class DashboardService {
         items: this.resolver.getDefaultBannersForWidget('Offer Banner', 'LITE'),
       },
       {
-        widgetId: '20000000-0000-4000-8000-000000000006',
+        widgetId: 'W022',
         widgetName: 'Fresh Fruits and Daily Greens',
         widgetRedirectTo: '/lite/category/fruits-greens',
         placement: 'HOME',
@@ -496,7 +490,7 @@ export class DashboardService {
         items: [],
       },
       {
-        widgetId: '20000000-0000-4000-8000-000000000007',
+        widgetId: 'W023',
         widgetName: 'Household Cleaning and Hygiene',
         widgetRedirectTo: '/lite/category/cleaning',
         placement: 'HOME',
@@ -528,29 +522,30 @@ export class DashboardService {
         create: {
           widgetId: w.widgetId,
           widgetName: w.widgetName,
-          widgetRedirectTo: w.widgetRedirectTo,
-          placement: w.placement,
+          widgetRedirectTo: w.widgetRedirectTo ?? '',
+          placement: w.placement || 'HOME',
           sequence: w.sequence,
-          territory: w.territory,
+          territory: w.territory || 'ALL',
           module: w.module,
           items: w.items,
-          categoryId: w.categoryId ?? null,
-          productId: null,
-          warehouseId: null,
-          redirectCategoryId: null,
-          redirectProductId: null,
+          categoryId: w.categoryId ?? '',
+          productId: '',
+          warehouseId: '',
+          redirectCategoryId: '',
+          redirectProductId: '',
           effectiveFrom: now,
-          effectiveTo: null,
+          effectiveTo: PERPETUAL_EXPIRY_DATE,
           status: w.status,
-          createdBy: 'SYSTEM_INIT',
-          updatedBy: 'SYSTEM_INIT',
+          createdBy: 'SYSTEM',
+          updatedBy: 'SYSTEM',
         },
         update: {
           widgetName: w.widgetName,
           sequence: w.sequence,
           module: w.module,
-          placement: w.placement,
+          placement: w.placement || 'HOME',
           status: w.status,
+          updatedBy: 'SYSTEM',
         },
       });
       insertedCount++;
@@ -582,22 +577,22 @@ export class DashboardService {
       data: {
         widgetId,
         widgetName: (dto.widget_name || dto.Widget_name || '').trim(),
-        widgetRedirectTo: dto.widget_redirect_to?.trim() ?? dto.Redirected_to?.trim() ?? null,
-        placement: dto.placement?.trim() ?? dto.Placement?.trim() ?? null,
-        sequence: dto.sequence !== undefined && dto.sequence !== null ? Number(dto.sequence) : (dto.Sequence !== undefined && dto.Sequence !== null ? Number(dto.Sequence) : null),
-        territory: dto.territory?.trim() ?? dto.Territory?.trim() ?? null,
+        widgetRedirectTo: (dto.widget_redirect_to ?? dto.Redirected_to)?.trim() || '',
+        placement: (dto.placement ?? dto.Placement)?.trim() || 'HOME',
+        sequence: dto.sequence !== undefined && dto.sequence !== null ? Number(dto.sequence) : (dto.Sequence !== undefined && dto.Sequence !== null ? Number(dto.Sequence) : 0),
+        territory: (dto.territory ?? dto.Territory)?.trim() || 'ALL',
         items: Array.isArray(dto.items) ? dto.items : (Array.isArray(dto.Items) ? dto.Items : []),
-        productId: dto.product_id?.trim() ?? dto.Product_Id?.trim() ?? null,
-        categoryId: dto.category_id?.trim() ?? dto.Category_Id?.trim() ?? null,
-        warehouseId: dto.warehouse_id?.trim() ?? null,
-        redirectCategoryId: dto.redirect_category_id?.trim() ?? null,
-        redirectProductId: dto.redirect_product_id?.trim() ?? null,
-        effectiveFrom: dto.effective_from ? new Date(dto.effective_from) : null,
-        effectiveTo: dto.effective_to ? new Date(dto.effective_to) : null,
+        productId: (dto.product_id ?? dto.Product_Id)?.trim() || '',
+        categoryId: (dto.category_id ?? dto.Category_Id)?.trim() || '',
+        warehouseId: dto.warehouse_id?.trim() || '',
+        redirectCategoryId: dto.redirect_category_id?.trim() || '',
+        redirectProductId: dto.redirect_product_id?.trim() || '',
+        effectiveFrom: dto.effective_from ? new Date(dto.effective_from) : new Date(),
+        effectiveTo: dto.effective_to ? new Date(dto.effective_to) : PERPETUAL_EXPIRY_DATE,
         status: dto.status !== undefined ? Boolean(dto.status) : true,
-        module: dto.module?.trim() ?? null,
-        createdBy: dto.created_by?.trim() ?? null,
-        updatedBy: dto.updated_by?.trim() ?? null,
+        module: (dto.module?.trim() || 'HAATZA').toUpperCase(),
+        createdBy: dto.created_by?.trim() || 'SYSTEM',
+        updatedBy: dto.updated_by?.trim() || 'SYSTEM',
       },
     });
 
@@ -662,20 +657,8 @@ export class DashboardService {
     if (query.active_only) {
       const now = new Date();
       where.status = true;
-      where.AND = [
-        {
-          OR: [
-            { effectiveFrom: null },
-            { effectiveFrom: { lte: now } },
-          ],
-        },
-        {
-          OR: [
-            { effectiveTo: null },
-            { effectiveTo: { gte: now } },
-          ],
-        },
-      ];
+      where.effectiveFrom = { lte: now };
+      where.effectiveTo = { gte: now };
     }
 
     if (query.search) {
@@ -769,53 +752,53 @@ export class DashboardService {
       updateData.widgetName = (dto.widget_name ?? dto.Widget_name)?.trim() || existing.widgetName;
     }
     if (dto.widget_redirect_to !== undefined || dto.Redirected_to !== undefined) {
-      updateData.widgetRedirectTo = (dto.widget_redirect_to ?? dto.Redirected_to)?.trim() || null;
+      updateData.widgetRedirectTo = (dto.widget_redirect_to ?? dto.Redirected_to)?.trim() || '';
     }
     if (dto.placement !== undefined || dto.Placement !== undefined) {
-      updateData.placement = (dto.placement ?? dto.Placement)?.trim() || null;
+      updateData.placement = (dto.placement ?? dto.Placement)?.trim() || 'HOME';
     }
     if (dto.sequence !== undefined || dto.Sequence !== undefined) {
       const seqVal = dto.sequence ?? dto.Sequence;
-      updateData.sequence = seqVal !== null && seqVal !== undefined ? Number(seqVal) : null;
+      updateData.sequence = seqVal !== null && seqVal !== undefined ? Number(seqVal) : 0;
     }
     if (dto.territory !== undefined || dto.Territory !== undefined) {
-      updateData.territory = (dto.territory ?? dto.Territory)?.trim() || null;
+      updateData.territory = (dto.territory ?? dto.Territory)?.trim() || 'ALL';
     }
     if (dto.items !== undefined || dto.Items !== undefined) {
       updateData.items = Array.isArray(dto.items) ? dto.items : (Array.isArray(dto.Items) ? dto.Items : []);
     }
     if (dto.product_id !== undefined || dto.Product_Id !== undefined) {
-      updateData.productId = (dto.product_id ?? dto.Product_Id)?.trim() || null;
+      updateData.productId = (dto.product_id ?? dto.Product_Id)?.trim() || '';
     }
     if (dto.category_id !== undefined || dto.Category_Id !== undefined) {
-      updateData.categoryId = (dto.category_id ?? dto.Category_Id)?.trim() || null;
+      updateData.categoryId = (dto.category_id ?? dto.Category_Id)?.trim() || '';
     }
     if (dto.warehouse_id !== undefined) {
-      updateData.warehouseId = dto.warehouse_id?.trim() || null;
+      updateData.warehouseId = dto.warehouse_id?.trim() || '';
     }
     if (dto.redirect_category_id !== undefined) {
-      updateData.redirectCategoryId = dto.redirect_category_id?.trim() || null;
+      updateData.redirectCategoryId = dto.redirect_category_id?.trim() || '';
     }
     if (dto.redirect_product_id !== undefined) {
-      updateData.redirectProductId = dto.redirect_product_id?.trim() || null;
+      updateData.redirectProductId = dto.redirect_product_id?.trim() || '';
     }
     if (dto.effective_from !== undefined) {
-      updateData.effectiveFrom = dto.effective_from ? new Date(dto.effective_from) : null;
+      updateData.effectiveFrom = dto.effective_from ? new Date(dto.effective_from) : new Date();
     }
     if (dto.effective_to !== undefined) {
-      updateData.effectiveTo = dto.effective_to ? new Date(dto.effective_to) : null;
+      updateData.effectiveTo = dto.effective_to ? new Date(dto.effective_to) : PERPETUAL_EXPIRY_DATE;
     }
     if (dto.status !== undefined) {
       updateData.status = Boolean(dto.status);
     }
     if (dto.module !== undefined) {
-      updateData.module = dto.module?.trim() || null;
+      updateData.module = dto.module?.trim() ? dto.module.trim().toUpperCase() : existing.module;
     }
     if (dto.created_by !== undefined) {
-      updateData.createdBy = dto.created_by?.trim() || null;
+      updateData.createdBy = dto.created_by?.trim() || 'SYSTEM';
     }
     if (dto.updated_by !== undefined) {
-      updateData.updatedBy = dto.updated_by?.trim() || null;
+      updateData.updatedBy = dto.updated_by?.trim() || 'SYSTEM';
     }
 
     const updated = await this.prisma.dashboard.update({
