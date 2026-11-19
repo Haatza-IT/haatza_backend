@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { DashboardResolverService } from './dashboard-resolver.service';
 import { resolveTerritory, isTerritoryMatch } from './territory.util';
+import { sanitizeNulls } from '../../common/utils/null-sanitizer.util';
 import type {
   CreateDashboardDto,
   UpdateDashboardDto,
@@ -56,82 +57,33 @@ export class DashboardService {
   }
 
   /**
-   * Recursive sanitizer that guarantees zero null/undefined values in customer API responses.
-   */
-  private sanitizeNulls<T>(obj: T): T {
-    if (obj === null || obj === undefined) {
-      return '' as any;
-    }
-    if (Array.isArray(obj)) {
-      return obj.map((item) => this.sanitizeNulls(item)) as any;
-    }
-    if (typeof obj === 'object') {
-      const clean: Record<string, any> = {};
-      for (const [key, value] of Object.entries(obj as Record<string, any>)) {
-        if (value === null || value === undefined) {
-          if (
-            key === 'sequence' ||
-            key === 'price' ||
-            key === 'mrp' ||
-            key === 'discount' ||
-            key === 'onSalePrice' ||
-            key === 'onsale_price' ||
-            key === 'total_items' ||
-            key === 'total_widgets'
-          ) {
-            clean[key] = 0;
-          } else if (
-            key === 'status' ||
-            key === 'isAddToCart' ||
-            key === 'isHaatzaLite' ||
-            key === 'is_haatzalite' ||
-            key === 'haatzaVerified' ||
-            key === 'haatza_verified' ||
-            key === 'success'
-          ) {
-            clean[key] = false;
-          } else if (key === 'items' || key === 'data' || key === 'widgets') {
-            clean[key] = [];
-          } else {
-            clean[key] = '';
-          }
-        } else if (typeof value === 'object') {
-          clean[key] = this.sanitizeNulls(value);
-        } else {
-          clean[key] = value;
-        }
-      }
-      return clean as any;
-    }
-    return obj;
-  }
-
-  /**
    * Helper to format a database Dashboard record for API responses.
-   * Returns exact 18 fields in standard contract.
+   * Returns exact 18 fields in standard contract with guaranteed non-null types.
    */
   private formatWidget(record: any): DashboardWidget {
+    const rawItems = Array.isArray(record.items) ? record.items : [];
+    const sanitizedItems = sanitizeNulls(rawItems);
     return {
-      widget_id: record.widgetId ?? record.widget_id,
-      widget_name: record.widgetName ?? record.widget_name,
-      widget_redirect_to: record.widgetRedirectTo ?? record.widget_redirect_to ?? '',
-      placement: record.placement ?? 'HOME',
+      widget_id: String(record.widgetId ?? record.widget_id ?? ''),
+      widget_name: String(record.widgetName ?? record.widget_name ?? ''),
+      widget_redirect_to: String(record.widgetRedirectTo ?? record.widget_redirect_to ?? ''),
+      placement: String(record.placement ?? 'HOME'),
       sequence: record.sequence !== null && record.sequence !== undefined ? Number(record.sequence) : 0,
-      territory: record.territory ?? 'ALL',
-      items: Array.isArray(record.items) ? record.items : [],
-      product_id: record.productId ?? record.product_id ?? '',
-      category_id: record.categoryId ?? record.category_id ?? '',
-      warehouse_id: record.warehouseId ?? record.warehouse_id ?? '',
-      redirect_category_id: record.redirectCategoryId ?? record.redirect_category_id ?? '',
-      redirect_product_id: record.redirectProductId ?? record.redirect_product_id ?? '',
+      territory: String(record.territory ?? 'ALL'),
+      items: sanitizedItems,
+      product_id: String(record.productId ?? record.product_id ?? ''),
+      category_id: String(record.categoryId ?? record.category_id ?? ''),
+      warehouse_id: String(record.warehouseId ?? record.warehouse_id ?? ''),
+      redirect_category_id: String(record.redirectCategoryId ?? record.redirect_category_id ?? ''),
+      redirect_product_id: String(record.redirectProductId ?? record.redirect_product_id ?? ''),
       effective_from: record.effectiveFrom ? new Date(record.effectiveFrom).toISOString() : '',
       effective_to: record.effectiveTo ? new Date(record.effectiveTo).toISOString() : '',
       status: record.status !== undefined ? Boolean(record.status) : true,
-      module: record.module ?? 'HAATZA',
-      created_by: record.createdBy ?? record.created_by ?? '',
-      updated_by: record.updatedBy ?? record.updated_by ?? '',
-      created_at: record.createdAt ? new Date(record.createdAt).toISOString() : undefined,
-      updated_at: record.updatedAt ? new Date(record.updatedAt).toISOString() : undefined,
+      module: String(record.module ?? 'HAATZA'),
+      created_by: String(record.createdBy ?? record.created_by ?? ''),
+      updated_by: String(record.updatedBy ?? record.updated_by ?? ''),
+      created_at: record.createdAt ? new Date(record.createdAt).toISOString() : '',
+      updated_at: record.updatedAt ? new Date(record.updatedAt).toISOString() : '',
     };
   }
 
@@ -265,7 +217,7 @@ export class DashboardService {
       widgets: resolvedWidgets,
     };
 
-    const sanitized = this.sanitizeNulls(response);
+    const sanitized = sanitizeNulls(response);
     sanitized.widgets = sanitized.data;
     this.setInCache(cacheKey, sanitized);
     return sanitized;
@@ -651,11 +603,13 @@ export class DashboardService {
 
     this.clearCache();
 
-    return {
+    const response: DashboardResponse = {
       success: true,
       data: this.formatWidget(created),
       message: 'Dashboard widget created successfully.',
     };
+
+    return sanitizeNulls(response);
   }
 
   /**
@@ -753,8 +707,9 @@ export class DashboardService {
       totalPages: Math.ceil(total / limit) || 1,
     };
 
-    this.setInCache(cacheKey, response);
-    return response;
+    const sanitized = sanitizeNulls(response);
+    this.setInCache(cacheKey, sanitized);
+    return sanitized;
   }
 
   /**
@@ -784,8 +739,9 @@ export class DashboardService {
       data: this.formatWidget(record),
     };
 
-    this.setInCache(cacheKey, response);
-    return response;
+    const sanitized = sanitizeNulls(response);
+    this.setInCache(cacheKey, sanitized);
+    return sanitized;
   }
 
   /**
@@ -869,11 +825,13 @@ export class DashboardService {
 
     this.clearCache();
 
-    return {
+    const response: DashboardResponse = {
       success: true,
       data: this.formatWidget(updated),
       message: 'Dashboard widget updated successfully.',
     };
+
+    return sanitizeNulls(response);
   }
 
   /**

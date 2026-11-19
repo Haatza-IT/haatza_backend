@@ -120,14 +120,14 @@ export interface DashboardWidget {
   warehouse_id: string;
   redirect_category_id: string;
   redirect_product_id: string;
-  effective_from?: string;
-  effective_to?: string;
+  effective_from: string;
+  effective_to: string;
   status: boolean;
   module: string;
   created_by: string;
   updated_by: string;
-  created_at?: string;
-  updated_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CreateDashboardDto {

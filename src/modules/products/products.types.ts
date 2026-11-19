@@ -22,9 +22,9 @@ export type ProductQueryDto = z.infer<typeof productQuerySchema>;
 export interface PublicSellerSummary {
   sellerId: string;
   name: string;
-  companyName?: string | null;
-  city?: string | null;
-  state?: string | null;
+  companyName: string;
+  city: string;
+  state: string;
 }
 
 /**
@@ -32,42 +32,42 @@ export interface PublicSellerSummary {
  */
 export interface SerializedProduct {
   // A. Product and Seller Information (1-18)
-  sellerId: string | null;
+  sellerId: string;
   categoryId: string;
   productId: string;
   id: string; // Legacy alias matching productId
   productName: string;
   name: string; // Legacy alias matching productName
-  categoryName: string | null;
-  productCoverImage: string | null;
-  productCoverImages: string[] | any; // Legacy alias returning [productCoverImage]
-  productImages: MediaItem[] | any;
-  sku: string | null;
-  shippingWeight: number | null;
-  brand: string | null;
+  categoryName: string;
+  productCoverImage: string;
+  productCoverImages: string[]; // Legacy alias returning [productCoverImage]
+  productImages: MediaItem[] | any[];
+  sku: string;
+  shippingWeight: number;
+  brand: string;
   status: boolean;
   isActive: boolean; // Legacy alias matching status
   productOptions: Record<string, string[]> | any;
   price: number;
-  productType: string | null;
-  discount: number | null;
+  productType: string;
+  discount: number;
   manageVariants: boolean;
-  ribbon: string | null;
+  ribbon: string;
   trackInventory: boolean;
-  variantPrice: VariantPriceItem[] | any;
+  variantPrice: VariantPriceItem[] | any[];
 
   // B. Product Specifications and Images (19-29)
-  productSpecification: Record<string, any> | any;
+  productSpecification: Record<string, any>;
   influencerBranding: boolean;
   activeAd: boolean;
-  subcategoryName: string | null;
-  subcategoryId: string | null;
+  subcategoryName: string;
+  subcategoryId: string;
   haatzaVerified: boolean;
-  promotionalImages: PromotionalImageItem[] | any;
-  paymentType: string | null;
+  promotionalImages: PromotionalImageItem[] | any[];
+  paymentType: string;
   returnPolicy: any;
   deliveryCharges: boolean;
-  sizeChart: string | null;
+  sizeChart: string;
 
   // C. Marketing and Analytics (30-36)
   priorityScore: number;
@@ -79,49 +79,49 @@ export interface SerializedProduct {
   revenue: number;
 
   // D. Seller, GST and Business Information (37-48)
-  sellerPincode: string | null;
+  sellerPincode: string;
   isGstSeller: boolean;
-  searchKeyword: string[] | any;
+  searchKeyword: string[];
   isSellerEarn: boolean;
   sellAndEarnCommission: number;
   isDomestic: boolean;
-  businessState: string | null;
-  businessStateCode: string | null;
-  salesTerritoryType: string | null;
-  businessRegistrationType: string | null;
-  gstNo: string | null;
-  panNumber: string | null;
+  businessState: string;
+  businessStateCode: string;
+  salesTerritoryType: string;
+  businessRegistrationType: string;
+  gstNo: string;
+  panNumber: string;
 
   // E. Pricing and Payment Information (49-53)
-  codPrice: number | null;
-  upi: string | null;
-  mrp: number | null;
-  onSalePrice: number | null;
-  upiPaymentDiscount: number | null;
+  codPrice: number;
+  upi: string;
+  mrp: number;
+  onSalePrice: number;
+  upiPaymentDiscount: number;
 
   // F. Campaign, Category and Warehouse Information (54-59)
-  campaignId: string | null;
-  similarCategoryId: string | null;
-  productHighlights: string[] | any;
+  campaignId: string;
+  similarCategoryId: string;
+  productHighlights: string[];
   isHaatzaLite: boolean;
-  warehouseId: string | null;
-  warehousePincode: string | null;
+  warehouseId: string;
+  warehousePincode: string;
 
   // Preserved Existing Fields
-  description: string | null;
-  image: string | null;
+  description: string;
+  image: string;
   stock: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 
   // Relations (Safe presentation)
   category?: {
     id: string;
     name: string;
     slug: string;
-    image?: string | null;
-  } | null;
-  seller?: PublicSellerSummary | null;
+    image: string;
+  };
+  seller?: PublicSellerSummary;
 }
 
 export interface ProductResponse {

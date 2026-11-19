@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
+import { sanitizeNulls } from '../../common/utils/null-sanitizer.util';
 import type {
   CreateProductDto,
   UpdateProductDto,
@@ -44,50 +45,51 @@ export class ProductsService {
   /**
    * Serializes a database product record into the standard response shape,
    * providing both new camelCase fields and legacy aliases (id, name, isActive).
+   * Guaranteed zero null/undefined values using strictly typed defaults.
    * Sensitive seller details are stripped.
    */
   private serializeProduct(product: any): SerializedProduct {
-    return {
+    const serialized: SerializedProduct = {
       // A. Product and Seller Information (1-18)
-      sellerId: product.sellerId ?? null,
-      categoryId: product.categoryId,
-      productId: product.productId,
-      id: product.productId, // Legacy alias
-      productName: product.productName,
-      name: product.productName, // Legacy alias
-      categoryName: product.categoryName ?? (product.category?.name ?? null),
-      productCoverImage: product.productCoverImage ?? null,
-      productCoverImages: product.productCoverImage ? [product.productCoverImage] : [],
-      productImages: product.productImages ?? [],
-      sku: product.sku ?? null,
-      shippingWeight: product.shippingWeight !== null && product.shippingWeight !== undefined ? Number(product.shippingWeight) : null,
-      brand: product.brand ?? null,
-      status: product.status,
-      isActive: product.status, // Legacy alias
-      productOptions: product.productOptions ?? null,
+      sellerId: String(product.sellerId ?? ''),
+      categoryId: String(product.categoryId ?? ''),
+      productId: String(product.productId ?? ''),
+      id: String(product.productId ?? ''), // Legacy alias
+      productName: String(product.productName ?? ''),
+      name: String(product.productName ?? ''), // Legacy alias
+      categoryName: String(product.categoryName ?? (product.category?.name ?? '')),
+      productCoverImage: String(product.productCoverImage ?? ''),
+      productCoverImages: product.productCoverImage ? [String(product.productCoverImage)] : [],
+      productImages: Array.isArray(product.productImages) ? product.productImages : [],
+      sku: String(product.sku ?? ''),
+      shippingWeight: product.shippingWeight !== null && product.shippingWeight !== undefined ? Number(product.shippingWeight) : 0,
+      brand: String(product.brand ?? ''),
+      status: product.status !== undefined ? Boolean(product.status) : true,
+      isActive: product.status !== undefined ? Boolean(product.status) : true, // Legacy alias
+      productOptions: product.productOptions && typeof product.productOptions === 'object' ? product.productOptions : {},
       price: product.price !== null && product.price !== undefined ? Number(product.price) : 0,
-      productType: product.productType ?? null,
+      productType: String(product.productType ?? ''),
       discount: product.discount !== null && product.discount !== undefined ? Number(product.discount) : 0,
-      manageVariants: product.manageVariants ?? false,
-      ribbon: product.ribbon ?? null,
-      trackInventory: product.trackInventory ?? true,
-      variantPrice: product.variantPrice ?? [],
+      manageVariants: Boolean(product.manageVariants),
+      ribbon: String(product.ribbon ?? ''),
+      trackInventory: product.trackInventory !== undefined ? Boolean(product.trackInventory) : true,
+      variantPrice: Array.isArray(product.variantPrice) ? product.variantPrice : [],
 
       // B. Product Specifications and Images (19-29)
-      productSpecification: product.productSpecification ?? null,
-      influencerBranding: product.influencerBranding ?? false,
-      activeAd: product.activeAd ?? false,
-      subcategoryName: product.subcategoryName ?? null,
-      subcategoryId: product.subcategoryId ?? null,
-      haatzaVerified: product.haatzaVerified ?? false,
-      promotionalImages: product.promotionalImages ?? [],
-      paymentType: product.paymentType ?? null,
-      returnPolicy: product.returnPolicy ?? null,
-      deliveryCharges: product.deliveryCharges ?? false,
-      sizeChart: product.sizeChart ?? null,
+      productSpecification: product.productSpecification && typeof product.productSpecification === 'object' ? product.productSpecification : {},
+      influencerBranding: Boolean(product.influencerBranding),
+      activeAd: Boolean(product.activeAd),
+      subcategoryName: String(product.subcategoryName ?? ''),
+      subcategoryId: String(product.subcategoryId ?? ''),
+      haatzaVerified: Boolean(product.haatzaVerified),
+      promotionalImages: Array.isArray(product.promotionalImages) ? product.promotionalImages : [],
+      paymentType: String(product.paymentType ?? ''),
+      returnPolicy: product.returnPolicy ? (typeof product.returnPolicy === 'object' ? product.returnPolicy : { policy: String(product.returnPolicy) }) : {},
+      deliveryCharges: Boolean(product.deliveryCharges),
+      sizeChart: String(product.sizeChart ?? ''),
 
       // C. Marketing and Analytics (30-36)
-      priorityScore: product.priorityScore ?? 0,
+      priorityScore: typeof product.priorityScore === 'number' ? product.priorityScore : 0,
       averageCpc: product.averageCpc !== null && product.averageCpc !== undefined ? Number(product.averageCpc) : 0,
       reach: product.reach !== null && product.reach !== undefined ? Number(product.reach) : 0,
       impression: product.impression !== null && product.impression !== undefined ? Number(product.impression) : 0,
@@ -96,60 +98,62 @@ export class ProductsService {
       revenue: product.revenue !== null && product.revenue !== undefined ? Number(product.revenue) : 0,
 
       // D. Seller, GST and Business Information (37-48)
-      sellerPincode: product.sellerPincode ?? null,
-      isGstSeller: product.isGstSeller ?? false,
-      searchKeyword: product.searchKeyword ?? [],
-      isSellerEarn: product.isSellerEarn ?? false,
-      sellAndEarnCommission: product.sellAndEarnCommission ?? 0,
-      isDomestic: product.isDomestic ?? true,
-      businessState: product.businessState ?? null,
-      businessStateCode: product.businessStateCode ?? null,
-      salesTerritoryType: product.salesTerritoryType ?? null,
-      businessRegistrationType: product.businessRegistrationType ?? null,
-      gstNo: product.gstNo ?? null,
-      panNumber: product.panNumber ?? null,
+      sellerPincode: String(product.sellerPincode ?? ''),
+      isGstSeller: Boolean(product.isGstSeller),
+      searchKeyword: Array.isArray(product.searchKeyword) ? product.searchKeyword : [],
+      isSellerEarn: Boolean(product.isSellerEarn),
+      sellAndEarnCommission: typeof product.sellAndEarnCommission === 'number' ? product.sellAndEarnCommission : 0,
+      isDomestic: product.isDomestic !== undefined ? Boolean(product.isDomestic) : true,
+      businessState: String(product.businessState ?? ''),
+      businessStateCode: String(product.businessStateCode ?? ''),
+      salesTerritoryType: String(product.salesTerritoryType ?? ''),
+      businessRegistrationType: String(product.businessRegistrationType ?? ''),
+      gstNo: String(product.gstNo ?? ''),
+      panNumber: String(product.panNumber ?? ''),
 
       // E. Pricing and Payment Information (49-53)
-      codPrice: product.codPrice !== null && product.codPrice !== undefined ? Number(product.codPrice) : null,
-      upi: product.upi ?? null,
-      mrp: product.mrp !== null && product.mrp !== undefined ? Number(product.mrp) : null,
-      onSalePrice: product.onSalePrice !== null && product.onSalePrice !== undefined ? Number(product.onSalePrice) : null,
-      upiPaymentDiscount: product.upiPaymentDiscount !== null && product.upiPaymentDiscount !== undefined ? Number(product.upiPaymentDiscount) : null,
+      codPrice: product.codPrice !== null && product.codPrice !== undefined ? Number(product.codPrice) : 0,
+      upi: product.upi ? String(product.upi) : '',
+      mrp: product.mrp !== null && product.mrp !== undefined ? Number(product.mrp) : 0,
+      onSalePrice: product.onSalePrice !== null && product.onSalePrice !== undefined ? Number(product.onSalePrice) : 0,
+      upiPaymentDiscount: product.upiPaymentDiscount !== null && product.upiPaymentDiscount !== undefined ? Number(product.upiPaymentDiscount) : 0,
 
       // F. Campaign, Category and Warehouse Information (54-59)
-      campaignId: product.campaignId ?? null,
-      similarCategoryId: product.similarCategoryId ?? null,
-      productHighlights: product.productHighlights ?? [],
-      isHaatzaLite: product.isHaatzaLite ?? false,
-      warehouseId: product.warehouseId ?? null,
-      warehousePincode: product.warehousePincode ?? null,
+      campaignId: String(product.campaignId ?? ''),
+      similarCategoryId: String(product.similarCategoryId ?? ''),
+      productHighlights: Array.isArray(product.productHighlights) ? product.productHighlights : [],
+      isHaatzaLite: Boolean(product.isHaatzaLite),
+      warehouseId: String(product.warehouseId ?? ''),
+      warehousePincode: String(product.warehousePincode ?? ''),
 
       // Preserved Existing Fields
-      description: product.description ?? null,
-      image: product.image ?? null,
-      stock: product.stock ?? 0,
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
+      description: String(product.description ?? ''),
+      image: String(product.image ?? ''),
+      stock: typeof product.stock === 'number' ? product.stock : 0,
+      createdAt: product.createdAt ? new Date(product.createdAt).toISOString() : '',
+      updatedAt: product.updatedAt ? new Date(product.updatedAt).toISOString() : '',
 
       // Safe Relations
       category: product.category
         ? {
-            id: product.category.id,
-            name: product.category.name,
-            slug: product.category.slug,
-            image: product.category.image,
+            id: String(product.category.id ?? ''),
+            name: String(product.category.name ?? ''),
+            slug: String(product.category.slug ?? ''),
+            image: String(product.category.image ?? ''),
           }
         : undefined,
       seller: product.seller
         ? {
-            sellerId: product.seller.sellerId,
-            name: product.seller.name,
-            companyName: product.seller.companyName,
-            city: product.seller.city,
-            state: product.seller.state,
+            sellerId: String(product.seller.sellerId ?? ''),
+            name: String(product.seller.name ?? ''),
+            companyName: String(product.seller.companyName ?? ''),
+            city: String(product.seller.city ?? ''),
+            state: String(product.seller.state ?? ''),
           }
         : undefined,
     };
+
+    return sanitizeNulls(serialized);
   }
 
   /**
