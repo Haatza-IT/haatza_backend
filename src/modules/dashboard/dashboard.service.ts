@@ -133,6 +133,30 @@ export class DashboardService {
     const warehouseIdFilter = (query.warehouseId || query.warehouse_id || '').trim();
     const categoryIdFilter = (query.categoryId || query.category_id || '').trim();
 
+    // Strict parameter validation for category-specific requests:
+    // HAATZA category requests require 'module', 'categoryId', and 'territory'.
+    // LITE category requests require 'module', 'categoryId', 'territory', and 'warehouseId'.
+    if (categoryIdFilter) {
+      if (upperModule === 'HAATZA') {
+        if (!territoryFilter) {
+          throw new BadRequestException(
+            "For category-specific HAATZA requests, 'territory' (2-digit PIN prefix) is required along with 'categoryId'.",
+          );
+        }
+      } else if (upperModule === 'LITE') {
+        if (!territoryFilter) {
+          throw new BadRequestException(
+            "For category-specific LITE requests, 'territory' (2-digit PIN prefix) is required along with 'categoryId'.",
+          );
+        }
+        if (!warehouseIdFilter) {
+          throw new BadRequestException(
+            "For category-specific LITE requests, 'warehouseId' is required along with 'categoryId' and 'territory'.",
+          );
+        }
+      }
+    }
+
     // Territory validation: validate against the 28 states of India
     if (territoryFilter && territoryFilter !== 'ALL') {
       const resolved = resolveTerritory(territoryFilter);
@@ -165,13 +189,39 @@ export class DashboardService {
       where.placement = { in: [placementFilter, 'HOME', 'ALL', ''] };
     }
 
-    if (territoryFilter && territoryFilter !== 'ALL') {
-      // 2-digit location prefix (e.g. '56' for Bengaluru territory) or 'ALL'
-      where.territory = { in: [territoryFilter, 'ALL', ''] };
+    // Strict AND filtering:
+    // Mode 1: Category-Specific Requests (categoryId supplied)
+    // Mode 2: Unfiltered HOME Dashboard Requests (categoryId omitted)
+    if (upperModule === 'HAATZA') {
+      if (categoryIdFilter) {
+        where.categoryId = { equals: categoryIdFilter, mode: 'insensitive' };
+        if (territoryFilter && territoryFilter !== 'ALL') {
+          where.territory = { equals: territoryFilter, mode: 'insensitive' };
+        }
+      } else {
+        if (territoryFilter && territoryFilter !== 'ALL') {
+          where.territory = { in: [territoryFilter, 'ALL', ''] };
+        }
+      }
     }
 
-    if (warehouseIdFilter) {
-      where.warehouseId = { in: [warehouseIdFilter, 'ALL', ''] };
+    if (upperModule === 'LITE') {
+      if (categoryIdFilter) {
+        where.categoryId = { equals: categoryIdFilter, mode: 'insensitive' };
+        if (territoryFilter && territoryFilter !== 'ALL') {
+          where.territory = { equals: territoryFilter, mode: 'insensitive' };
+        }
+        if (warehouseIdFilter) {
+          where.warehouseId = { equals: warehouseIdFilter, mode: 'insensitive' };
+        }
+      } else {
+        if (territoryFilter && territoryFilter !== 'ALL') {
+          where.territory = { in: [territoryFilter, 'ALL', ''] };
+        }
+        if (warehouseIdFilter) {
+          where.warehouseId = { in: [warehouseIdFilter, 'ALL', ''] };
+        }
+      }
     }
 
     // Fetch configured widgets from database ordered by sequence
@@ -188,18 +238,6 @@ export class DashboardService {
         warehouseId: warehouseIdFilter,
       }),
     );
-
-    // If categoryId filter is provided, filter widgets while preserving layout structure:
-    // 1. BANNER widgets are layout-level promotional sections and must never be removed.
-    // 2. If a widget is explicitly dedicated to a different category, exclude it.
-    // 3. CATEGORY and PRODUCT_LIST widgets are preserved in the layout sequence even if their items array is empty.
-    if (categoryIdFilter) {
-      resolvedWidgets = resolvedWidgets.filter((w) => {
-        if (w.widget_type === 'BANNER') return true;
-        if (w.category_id && w.category_id !== categoryIdFilter) return false;
-        return true;
-      });
-    }
 
     // Deterministic ascending sequence ordering: strictly by sequence number ASC
     resolvedWidgets.sort((a, b) => a.sequence - b.sequence);
