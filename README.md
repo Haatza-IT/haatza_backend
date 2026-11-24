@@ -52,7 +52,7 @@ The project is structured according to **Clean Layered Architecture**:
    Configure your database URL and admin key:
    ```env
    DATABASE_URL="postgresql://postgres:password@localhost:5432/haatza_backend?schema=public"
-   ADMIN_API_KEY="haatza_admin_secret_key_2026"
+   ADMIN_API_KEY="YOUR_ADMIN_KEY"
    ```
 
 3. **Prisma Schema Validation & Client Generation:**

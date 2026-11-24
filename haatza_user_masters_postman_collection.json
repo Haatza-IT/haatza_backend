@@ -12,7 +12,7 @@
     },
     {
       "key": "adminApiKey",
-      "value": "haatza_admin_secret_key_2026",
+      "value": "YOUR_ADMIN_KEY",
       "type": "string"
     },
     {

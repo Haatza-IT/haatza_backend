@@ -11,19 +11,21 @@ import {
   HttpCode,
   HttpStatus,
   UsePipes,
+  UseGuards,
   Inject,
 } from '@nestjs/common';
 import { DashboardService } from './dashboard.service';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
 import {
   createDashboardSchema,
   updateDashboardSchema,
-  dashboardQuerySchema,
+  customerDashboardQuerySchema,
+  type CustomerDashboardQueryInput,
 } from './dashboard.schema';
 import type {
   CreateDashboardDto,
   UpdateDashboardDto,
-  DashboardQueryDto,
   DashboardResponse,
   DashboardListResponse,
   CustomerDashboardResponse,
@@ -37,59 +39,75 @@ export class DashboardController {
   ) {}
 
   /**
-   * Primary Customer & Admin Dashboard endpoint.
-   * If `module` is specified (e.g. ?module=SHOPPING or ?module=LITE) and `raw` is not true,
-   * returns the customer-facing dashboard with populated products, categories, and banners.
-   * If `raw=true` or no module is specified, returns the raw widget configurations for admin/CMS.
-   * 
-   * Methods:
-   * GET /api/dashboard?module=SHOPPING
-   * GET /api/dashboard?module=LITE
+   * Primary Customer Dashboard endpoint.
+   * If `raw=true` is sent by CMS/admin, returns raw widget records.
+   * Otherwise returns the unified Customer Dashboard response.
+   *
+   * Example:
+   * GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56
    */
   @Get()
   async getDashboard(
-    @Query(new ZodValidationPipe(dashboardQuerySchema)) query: DashboardQueryDto & { raw?: boolean },
+    @Query(new ZodValidationPipe(customerDashboardQuerySchema)) query: CustomerDashboardQueryInput,
   ): Promise<CustomerDashboardResponse | DashboardListResponse> {
-    if (query.module && !query.raw) {
-      return this.dashboardService.getCustomerDashboard(query);
+    if (query.raw) {
+      return this.dashboardService.findAllWidgets(query);
     }
-    return this.dashboardService.findAllWidgets(query);
+    return this.dashboardService.getCustomerDashboard(query);
   }
 
   /**
    * Explicit Customer Dashboard endpoint.
-   * Methods:
-   * GET /api/dashboard/customer?module=SHOPPING
-   * GET /api/dashboard/customer?module=LITE
+   *
+   * Example:
+   * GET /api/dashboard/customer?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56
    */
   @Get('customer')
   async getCustomerDashboard(
-    @Query(new ZodValidationPipe(dashboardQuerySchema)) query: DashboardQueryDto,
+    @Query(new ZodValidationPipe(customerDashboardQuerySchema)) query: CustomerDashboardQueryInput,
   ): Promise<CustomerDashboardResponse> {
     return this.dashboardService.getCustomerDashboard(query);
   }
 
   /**
-   * Seed / Re-initialize default widget configurations in PostgreSQL.
-   * Method: POST /api/dashboard/seed?module=SHOPPING
+   * Admin Endpoint: Clears the in-memory dashboard cache immediately.
+   * Method: POST /api/dashboard/cache/clear
+   * Header: x-admin-key: <ADMIN_API_KEY>
    */
-  @Post('seed')
+  @UseGuards(AdminAuthGuard)
+  @Post('cache/clear')
   @HttpCode(HttpStatus.OK)
-  async seedDefaultWidgets(
-    @Query('module') module?: string,
-  ): Promise<{ success: boolean; seeded: number; message: string }> {
-    const seeded = await this.dashboardService.seedDefaultWidgets(module);
+  async clearCache(): Promise<{ success: boolean; message: string }> {
+    this.dashboardService.clearCache();
     return {
       success: true,
-      seeded,
-      message: `Successfully seeded ${seeded} default widget configuration(s) into database.`,
+      message: 'Dashboard cache cleared successfully.',
+    };
+  }
+
+  /**
+   * Admin Endpoint: Seed/re-initialize the 169 HAATZA dashboard rows.
+   * Method: POST /api/dashboard/seed
+   * Header: x-admin-key: <ADMIN_API_KEY>
+   * Uses ON CONFLICT (widget_id) DO NOTHING: safe to re-run and never overwrites.
+   */
+  @UseGuards(AdminAuthGuard)
+  @Post('seed')
+  @HttpCode(HttpStatus.OK)
+  async seedDashboard(): Promise<{ success: boolean; inserted: number; message: string }> {
+    const result = await this.dashboardService.seedDashboard();
+    return {
+      success: true,
+      inserted: result.totalInserted,
+      message: `Seed completed: ${result.totalInserted} row(s) processed out of ${result.totalAttempted} attempted.`,
     };
   }
 
   /**
    * Creates a new dashboard widget.
-   * Method: POST /api/dashboard or POST /dashboard
+   * Method: POST /api/dashboard
    */
+  @UseGuards(AdminAuthGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createWidget(
@@ -100,7 +118,7 @@ export class DashboardController {
 
   /**
    * Retrieves a single dashboard widget by widget_id.
-   * Method: GET /api/dashboard/:id or GET /dashboard/:id
+   * Method: GET /api/dashboard/:id
    */
   @Get(':id')
   async findWidgetById(
@@ -111,8 +129,9 @@ export class DashboardController {
 
   /**
    * Updates an existing dashboard widget completely.
-   * Method: PUT /api/dashboard/:id or PUT /dashboard/:id
+   * Method: PUT /api/dashboard/:id
    */
+  @UseGuards(AdminAuthGuard)
   @Put(':id')
   async updateWidget(
     @Param('id') id: string,
@@ -123,8 +142,9 @@ export class DashboardController {
 
   /**
    * Updates an existing dashboard widget partially.
-   * Method: PATCH /api/dashboard/:id or PATCH /dashboard/:id
+   * Method: PATCH /api/dashboard/:id
    */
+  @UseGuards(AdminAuthGuard)
   @Patch(':id')
   async patchWidget(
     @Param('id') id: string,
@@ -135,8 +155,9 @@ export class DashboardController {
 
   /**
    * Deletes a dashboard widget by widget_id.
-   * Method: DELETE /api/dashboard/:id or DELETE /dashboard/:id
+   * Method: DELETE /api/dashboard/:id
    */
+  @UseGuards(AdminAuthGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteWidget(

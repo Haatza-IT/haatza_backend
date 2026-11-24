@@ -287,9 +287,9 @@ Promotes or demotes an existing registered user to internal employee status. It 
 ### Request Headers
 ```http
 Content-Type: application/json
-x-admin-key: haatza_admin_secret_key_2026
+x-admin-key: YOUR_ADMIN_KEY
 ```
-*(Alternatively, `Authorization: Bearer haatza_admin_secret_key_2026` is accepted)*
+*(Alternatively, `Authorization: Bearer YOUR_ADMIN_KEY` is accepted)*
 
 ### Request Body Schema
 | Field | Type | Required | Description |
@@ -364,7 +364,7 @@ Promotes or demotes an existing registered user to verified Nest Expert consulta
 ### Request Headers
 ```http
 Content-Type: application/json
-x-admin-key: haatza_admin_secret_key_2026
+x-admin-key: YOUR_ADMIN_KEY
 ```
 
 ### Request Body Schema

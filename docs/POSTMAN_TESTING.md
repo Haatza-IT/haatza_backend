@@ -14,7 +14,7 @@ A ready-to-import Postman Collection is also available at the root of the projec
    npm run dev
    ```
 2. **Base URL:** `http://localhost:3000`
-3. **Admin API Key:** `haatza_admin_secret_key_2026` (or the value set in `ADMIN_API_KEY` in `.env`).
+3. **Admin API Key:** `YOUR_ADMIN_KEY` (or the value set in `ADMIN_API_KEY` in `.env`).
 
 ---
 
@@ -179,7 +179,7 @@ A ready-to-import Postman Collection is also available at the root of the projec
 - **Headers:**
   ```http
   Content-Type: application/json
-  x-admin-key: haatza_admin_secret_key_2026
+  x-admin-key: YOUR_ADMIN_KEY
   ```
 - **Body:**
   ```json
@@ -194,7 +194,7 @@ A ready-to-import Postman Collection is also available at the root of the projec
 - **Headers:**
   ```http
   Content-Type: application/json
-  x-admin-key: haatza_admin_secret_key_2026
+  x-admin-key: YOUR_ADMIN_KEY
   ```
 - **Body:**
   ```json
@@ -229,7 +229,7 @@ A ready-to-import Postman Collection is also available at the root of the projec
 - **Headers:**
   ```http
   Content-Type: application/json
-  x-admin-key: haatza_admin_secret_key_2026
+  x-admin-key: YOUR_ADMIN_KEY
   ```
 - **Body:**
   ```json

@@ -62,7 +62,7 @@ export const timestampInputSchema = z
   .nullable();
 
 /**
- * Create Dashboard Widget Zod Schema (18 columns)
+ * Create Dashboard Widget Zod Schema (Accepts any valid row widget_id)
  */
 export const createDashboardSchema = z
   .object({
@@ -85,7 +85,7 @@ export const createDashboardSchema = z
     created_by: z.string().trim().optional().nullable(),
     updated_by: z.string().trim().optional().nullable(),
 
-    // Legacy / PascalCase fallback support
+    // Legacy fallback support
     Widget_id: z.string().trim().optional(),
     Widget_name: z.string().trim().optional(),
     Redirected_to: z.string().trim().optional().nullable(),
@@ -120,10 +120,15 @@ export const createDashboardSchema = z
       widget_id: finalWidgetId ? finalWidgetId.trim() : '',
       widget_name: finalWidgetName ? finalWidgetName.trim() : '',
       widget_redirect_to: (data.widget_redirect_to ?? data.Redirected_to)?.trim() || '',
-      placement: (data.placement ?? data.Placement)?.trim() || 'HOME',
-      sequence: data.sequence !== undefined && data.sequence !== null ? Number(data.sequence) : (data.Sequence !== undefined && data.Sequence !== null ? Number(data.Sequence) : 0),
-      territory: (data.territory ?? data.Territory)?.trim() || 'ALL',
-      items: data.items && data.items.length > 0 ? data.items : (data.Items ?? []),
+      placement: (data.placement ?? data.Placement)?.trim() || 'DESKTOP',
+      sequence:
+        data.sequence !== undefined && data.sequence !== null
+          ? Number(data.sequence)
+          : data.Sequence !== undefined && data.Sequence !== null
+            ? Number(data.Sequence)
+            : 0,
+      territory: (data.territory ?? data.Territory)?.trim() || '56',
+      items: data.items && data.items.length > 0 ? data.items : data.Items ?? [],
       product_id: (data.product_id ?? data.Product_Id)?.trim() || '',
       category_id: (data.category_id ?? data.Category_Id)?.trim() || '',
       warehouse_id: data.warehouse_id?.trim() || '',
@@ -132,16 +137,16 @@ export const createDashboardSchema = z
       effective_from: data.effective_from ?? null,
       effective_to: data.effective_to ?? null,
       status: data.status ?? true,
-      module: data.module?.trim() || null,
-      created_by: data.created_by?.trim() || 'SYSTEM',
-      updated_by: data.updated_by?.trim() || 'SYSTEM',
+      module: data.module?.trim() || 'HAATZA',
+      created_by: data.created_by?.trim() || 'admin1',
+      updated_by: data.updated_by?.trim() || 'admin1',
     };
   });
 
 export type CreateDashboardInput = z.infer<typeof createDashboardSchema>;
 
 /**
- * Update Dashboard Widget Zod Schema (18 columns)
+ * Update Dashboard Widget Zod Schema
  */
 export const updateDashboardSchema = z
   .object({
@@ -164,7 +169,7 @@ export const updateDashboardSchema = z
     created_by: z.string().trim().optional().nullable(),
     updated_by: z.string().trim().optional().nullable(),
 
-    // Legacy / PascalCase fallback support
+    // Legacy fallback support
     Widget_id: z.string().trim().optional(),
     Widget_name: z.string().trim().optional(),
     Redirected_to: z.string().trim().optional().nullable(),
@@ -199,36 +204,94 @@ export const updateDashboardSchema = z
 export type UpdateDashboardInput = z.infer<typeof updateDashboardSchema>;
 
 /**
- * Query parameters Zod Schema for listing dashboard widgets.
+ * Strict Customer Dashboard Query Schema
+ * Validates requirements before hitting cache or database:
+ * - module must be HAATZA or LITE
+ * - categoryId must be present
+ * - territory must be present and exactly 2 digits
+ * - For LITE, warehouseId must be present
  */
-export const dashboardQuerySchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(50),
-  module: z.string().trim().optional(),
-  placement: z.string().trim().optional(),
-  territory: z.string().trim().optional(),
-  warehouseId: z.string().trim().optional(),
-  warehouse_id: z.string().trim().optional(),
-  categoryId: z.string().trim().optional(),
-  category_id: z.string().trim().optional(),
-  sequence: z.coerce.number().int().optional(),
-  status: z
-    .string()
-    .trim()
-    .transform((v) => (v.toLowerCase() === 'true' ? true : v.toLowerCase() === 'false' ? false : undefined))
-    .optional(),
-  active_only: z
-    .string()
-    .trim()
-    .transform((v) => v.toLowerCase() === 'true' || v === '1')
-    .optional(),
-  search: z.string().trim().optional(),
-  raw: z
-    .union([
-      z.boolean(),
-      z.string().transform((v) => v.toLowerCase() === 'true' || v === '1'),
-    ])
-    .optional(),
-});
+export const customerDashboardQuerySchema = z
+  .object({
+    module: z.string().trim().min(1, "module is required. Allowed values: 'HAATZA', 'LITE'"),
+    categoryId: z.string().trim().optional(),
+    category_id: z.string().trim().optional(),
+    territory: z.string().trim().optional(),
+    warehouseId: z.string().trim().optional(),
+    warehouse_id: z.string().trim().optional(),
+    raw: z
+      .union([
+        z.boolean(),
+        z.string().transform((v) => v.toLowerCase() === 'true' || v === '1'),
+      ])
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    // 1. module check
+    const mod = data.module.toUpperCase();
+    if (mod !== 'HAATZA' && mod !== 'LITE') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['module'],
+        message: `module must be either 'HAATZA' or 'LITE'. Received: '${data.module}'`,
+      });
+    }
 
-export type DashboardQueryInput = z.infer<typeof dashboardQuerySchema>;
+    // If raw=true is set, this is an admin/CMS request, skip customer strict requirements
+    if (data.raw) {
+      return;
+    }
+
+    // 2. categoryId check
+    const catId = (data.categoryId || data.category_id || '').trim();
+    if (!catId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['categoryId'],
+        message: 'categoryId is required and must not be empty',
+      });
+    }
+
+    // 3. territory check (must be present and exactly 2 digits)
+    const terr = (data.territory || '').trim();
+    if (!terr) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['territory'],
+        message: 'territory is required and must be exactly 2 digits',
+      });
+    } else if (!/^\d{2}$/.test(terr)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['territory'],
+        message: `territory must be exactly 2 digits. Received: '${terr}'`,
+      });
+    }
+
+    // 4. warehouseId check for LITE
+    if (mod === 'LITE') {
+      const whId = (data.warehouseId || data.warehouse_id || '').trim();
+      if (!whId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['warehouseId'],
+          message: 'warehouseId is required for LITE module',
+        });
+      }
+    }
+  })
+  .transform((data) => ({
+    module: data.module.toUpperCase() as 'HAATZA' | 'LITE',
+    categoryId: (data.categoryId || data.category_id || '').trim(),
+    territory: (data.territory || '').trim(),
+    warehouseId: (data.warehouseId || data.warehouse_id || '').trim(),
+    raw: Boolean(data.raw),
+  }));
+
+export type CustomerDashboardQueryInput = z.infer<typeof customerDashboardQuerySchema>;
+
+/**
+ * General / Admin Dashboard Query Schema
+ */
+export const dashboardQuerySchema = customerDashboardQuerySchema;
+export type DashboardQueryInput = CustomerDashboardQueryInput;
