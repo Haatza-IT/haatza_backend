@@ -9,6 +9,12 @@ export const PLACEHOLDER_MENS_FASHION_ID = 'PLACEHOLDER_MENS_FASHION_ID';
 export const PLACEHOLDER_WOMENS_FASHION_ID = 'PLACEHOLDER_WOMENS_FASHION_ID';
 export const PLACEHOLDER_KIDS_FASHION_ID = 'PLACEHOLDER_KIDS_FASHION_ID';
 
+/**
+ * Shared layout placement constants across customer APIs, validation, caching, and admin management.
+ */
+export const ALLOWED_PLACEMENTS = ['DESKTOP', 'MOBILE'] as const;
+export type AllowedPlacement = (typeof ALLOWED_PLACEMENTS)[number];
+
 export interface CategoryDefinition {
   no: number;
   name: string;

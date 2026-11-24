@@ -200,8 +200,8 @@ export function formatDashboardResponse(
 ): CustomerDashboardResponse {
   const cleanWidgets: CleanDashboardWidget[] = rawWidgets.map(formatCleanWidget);
 
-  // Strictly sort by sequence ascending
-  cleanWidgets.sort((a, b) => a.sequence - b.sequence);
+  // Strictly sort by sequence ascending, with deterministic tie-breaker on widget_id ascending
+  cleanWidgets.sort((a, b) => a.sequence - b.sequence || a.widget_id.localeCompare(b.widget_id));
 
   const response: CustomerDashboardResponse = {
     success: true,

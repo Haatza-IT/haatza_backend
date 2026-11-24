@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ALLOWED_PLACEMENTS, type AllowedPlacement } from './dashboard.config';
 
 /**
  * Items validator: accepts a JSON array (PostgreSQL JSONB), or a JSON string parsed into an array.
@@ -69,7 +70,7 @@ export const createDashboardSchema = z
     widget_id: z.string().trim().min(1, 'widget_id is required').optional(),
     widget_name: z.string().trim().min(1, 'widget_name is required').optional(),
     widget_redirect_to: z.string().trim().optional().nullable(),
-    placement: z.string().trim().optional().nullable(),
+    placement: z.enum(ALLOWED_PLACEMENTS).optional().nullable(),
     sequence: sequenceInputSchema,
     territory: z.string().trim().optional().nullable(),
     items: itemsInputSchema,
@@ -89,7 +90,7 @@ export const createDashboardSchema = z
     Widget_id: z.string().trim().optional(),
     Widget_name: z.string().trim().optional(),
     Redirected_to: z.string().trim().optional().nullable(),
-    Placement: z.string().trim().optional().nullable(),
+    Placement: z.enum(ALLOWED_PLACEMENTS).optional().nullable(),
     Sequence: sequenceInputSchema,
     Territory: z.string().trim().optional().nullable(),
     Items: itemsInputSchema.optional(),
@@ -153,7 +154,7 @@ export const updateDashboardSchema = z
     widget_id: z.string().trim().optional(),
     widget_name: z.string().trim().min(1, 'widget_name cannot be empty').optional(),
     widget_redirect_to: z.string().trim().optional().nullable(),
-    placement: z.string().trim().optional().nullable(),
+    placement: z.enum(ALLOWED_PLACEMENTS).optional().nullable(),
     sequence: sequenceInputSchema,
     territory: z.string().trim().optional().nullable(),
     items: z.array(z.any()).optional(),
@@ -173,7 +174,7 @@ export const updateDashboardSchema = z
     Widget_id: z.string().trim().optional(),
     Widget_name: z.string().trim().optional(),
     Redirected_to: z.string().trim().optional().nullable(),
-    Placement: z.string().trim().optional().nullable(),
+    Placement: z.enum(ALLOWED_PLACEMENTS).optional().nullable(),
     Sequence: sequenceInputSchema,
     Territory: z.string().trim().optional().nullable(),
     Items: z.array(z.any()).optional(),
@@ -217,6 +218,7 @@ export const customerDashboardQuerySchema = z
     categoryId: z.string().trim().optional(),
     category_id: z.string().trim().optional(),
     territory: z.string().trim().optional(),
+    placement: z.string().trim().optional(),
     warehouseId: z.string().trim().optional(),
     warehouse_id: z.string().trim().optional(),
     raw: z
@@ -242,7 +244,24 @@ export const customerDashboardQuerySchema = z
       return;
     }
 
-    // 2. categoryId check
+    // 2. placement check (mandatory: strictly DESKTOP or MOBILE)
+    const rawPlc = data.placement;
+    const plc = (rawPlc || '').trim();
+    if (!plc) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['placement'],
+        message: `placement is required. Allowed values: ${ALLOWED_PLACEMENTS.map((p) => `'${p}'`).join(', ')}`,
+      });
+    } else if (!ALLOWED_PLACEMENTS.includes(plc as any)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['placement'],
+        message: `placement must be either 'DESKTOP' or 'MOBILE'. Received: '${rawPlc}'`,
+      });
+    }
+
+    // 3. categoryId check
     const catId = (data.categoryId || data.category_id || '').trim();
     if (!catId) {
       ctx.addIssue({
@@ -252,7 +271,7 @@ export const customerDashboardQuerySchema = z
       });
     }
 
-    // 3. territory check (must be present and exactly 2 digits)
+    // 4. territory check (must be present and exactly 2 digits)
     const terr = (data.territory || '').trim();
     if (!terr) {
       ctx.addIssue({
@@ -268,7 +287,7 @@ export const customerDashboardQuerySchema = z
       });
     }
 
-    // 4. warehouseId check for LITE
+    // 5. warehouseId check for LITE
     if (mod === 'LITE') {
       const whId = (data.warehouseId || data.warehouse_id || '').trim();
       if (!whId) {
@@ -284,6 +303,7 @@ export const customerDashboardQuerySchema = z
     module: data.module.toUpperCase() as 'HAATZA' | 'LITE',
     categoryId: (data.categoryId || data.category_id || '').trim(),
     territory: (data.territory || '').trim(),
+    placement: (data.placement || '').trim() as AllowedPlacement,
     warehouseId: (data.warehouseId || data.warehouse_id || '').trim(),
     raw: Boolean(data.raw),
   }));

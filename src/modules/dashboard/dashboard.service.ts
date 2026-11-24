@@ -97,13 +97,26 @@ export class DashboardService {
       throw new BadRequestException(`territory is required and must be exactly 2 digits. Received: '${territory}'`);
     }
 
+    const rawPlacement = (query.placement || '').trim().toUpperCase();
+    if (!rawPlacement || (rawPlacement !== 'DESKTOP' && rawPlacement !== 'MOBILE')) {
+      throw new BadRequestException(
+        `placement is required and must be either 'DESKTOP' or 'MOBILE'. Received: '${query.placement}'`,
+      );
+    }
+
     const warehouseId = (query.warehouseId || (query as any).warehouse_id || '').trim();
     if (rawModule === 'LITE' && !warehouseId) {
       throw new BadRequestException('warehouseId is required for LITE module');
     }
 
     // 2. Build cache key
-    const cacheKey = this.cacheService.buildKey(rawModule, categoryId, territory, warehouseId);
+    const cacheKey = this.cacheService.buildKey(
+      rawModule,
+      rawPlacement,
+      categoryId,
+      territory,
+      warehouseId,
+    );
 
     // 3. Query via cache loader with in-flight deduplication
     return this.cacheService.getOrSet(cacheKey, async () => {
@@ -126,14 +139,15 @@ export class DashboardService {
       // 1. category_id equals requested categoryId
       // 2. module equals requested module
       // 3. territory equals requested territory
-      // 4. LITE only: warehouse_id equals requested warehouseId
-      // 5. status = true
-      // 6. Today (IST) is between effective_from and effective_to. The last day counts fully.
-      // (placement is completely removed from filtering)
+      // 4. placement equals requested placement (DESKTOP or MOBILE)
+      // 5. LITE only: warehouse_id equals requested warehouseId
+      // 6. status = true
+      // 7. Today (IST) is between effective_from and effective_to. The last day counts fully.
       const where: any = {
         module: { equals: rawModule, mode: 'insensitive' },
         categoryId: { equals: categoryId },
         territory: { equals: territory },
+        placement: { equals: rawPlacement },
         status: true,
         effectiveFrom: { lte: endOfTodayIst },
         effectiveTo: { gte: startOfTodayIst },
@@ -230,6 +244,9 @@ export class DashboardService {
     if (query.sequence !== undefined && query.sequence !== null) {
       where.sequence = { equals: Number(query.sequence) };
     }
+    if (query.placement) {
+      where.placement = { equals: query.placement.trim() };
+    }
     if (query.status !== undefined) {
       where.status = { equals: Boolean(query.status) };
     }
@@ -240,7 +257,12 @@ export class DashboardService {
         where,
         skip,
         take: limit,
-        orderBy: [{ sequence: 'asc' }, { widgetId: 'asc' }],
+        orderBy: [
+          { module: 'asc' },
+          { categoryId: 'asc' },
+          { sequence: 'asc' },
+          { widgetId: 'asc' },
+        ],
       }),
     ]);
 

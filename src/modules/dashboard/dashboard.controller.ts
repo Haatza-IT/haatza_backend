@@ -44,7 +44,7 @@ export class DashboardController {
    * Otherwise returns the unified Customer Dashboard response.
    *
    * Example:
-   * GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56
+   * GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56&placement=DESKTOP
    */
   @Get()
   async getDashboard(
@@ -60,7 +60,7 @@ export class DashboardController {
    * Explicit Customer Dashboard endpoint.
    *
    * Example:
-   * GET /api/dashboard/customer?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56
+   * GET /api/dashboard/customer?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56&placement=DESKTOP
    */
   @Get('customer')
   async getCustomerDashboard(

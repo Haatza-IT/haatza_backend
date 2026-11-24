@@ -3,6 +3,10 @@
  * Supports the unified Dashboard API with JSONB items and zero null values.
  */
 
+import { ALLOWED_PLACEMENTS, type AllowedPlacement } from './dashboard.config';
+
+export { ALLOWED_PLACEMENTS, AllowedPlacement };
+
 export interface BannerItem {
   banner_image: string;
   title: string;
@@ -52,9 +56,12 @@ export interface DashboardQueryDto {
   module: string;
   categoryId: string;
   territory: string;
+  placement: AllowedPlacement;
   warehouseId?: string;
   raw?: boolean;
 }
+
+export type CustomerDashboardQueryDto = DashboardQueryDto;
 
 export interface DashboardWidget {
   widget_id: string;

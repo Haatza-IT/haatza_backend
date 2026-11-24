@@ -13,7 +13,7 @@ This document provides technical documentation for the two customer-facing Dashb
 
 **Endpoint:**
 ```http
-GET /api/dashboard?module=HAATZA&categoryId=c1000000-0000-4000-8000-000000000001&territory=56
+GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56&placement=DESKTOP
 ```
 
 **Purpose:** Fetches the customer dashboard layout for HAATZA Shopping, including promotional hero banners, category grids, flash deals, and curated product shelves.
@@ -23,9 +23,9 @@ GET /api/dashboard?module=HAATZA&categoryId=c1000000-0000-4000-8000-000000000001
 | Parameter | Required | Data Type | Default | Description & Validation Behavior |
 |---|:---:|---|:---:|---|
 | `module` | **Yes** | `string` | — | Dashboard module identifier. Must be strictly `HAATZA` (case-insensitive). Missing, invalid, or legacy values (e.g. `SHOPPING`) reject with HTTP 400 Bad Request. |
-| `categoryId` | No | `string` | — | Category UUID (e.g. `c1000000-0000-4000-8000-000000000001` for Fashion). Filters product items to matching category items while preserving all layout banner slots and sequence containers. Accepts a string value; does not perform strict database existence validation. A non-matching or unknown category ID does **not** return HTTP 400; unassigned/banner widgets are preserved, and non-matching product shelves return `items: []` with `total_items: 0`. |
-| `territory` | No | `string` | `ALL` | PIN-code prefix for one of the 28 states of India (e.g. `56` for Bengaluru / Karnataka) or `ALL`. Invalid state prefixes throw HTTP 400 Bad Request. |
-| `placement` | No | `string` | `HOME` | Layout placement filter (e.g. `HOME`). |
+| `categoryId` | **Yes** | `string` | — | Category UUID (e.g. `c4000000-0000-4000-8000-000000000101` for All, `c4000000-0000-4000-8000-000000000102` for Electronics). Filters layout widgets and items to the requested category. Missing or empty category ID rejects with HTTP 400 Bad Request. |
+| `territory` | **Yes** | `string` | — | Exact 2-digit state PIN-code prefix (e.g. `56` for Karnataka). Missing or invalid non-2-digit values reject with HTTP 400 Bad Request. |
+| `placement` | **Yes** | `string` | — | Layout placement filter. Must be strictly `DESKTOP` or `MOBILE` (case-sensitive uppercase). Missing or invalid values reject with HTTP 400 Bad Request. |
 
 **Configured Widgets:** Configured widgets `W001` through `W016` (sequence 1–16). All 16 layout containers are preserved; product shelves without matching category products return `items: []` rather than disappearing from the sequence.
 
@@ -1396,7 +1396,7 @@ GET /api/dashboard?module=HAATZA&categoryId=c1000000-0000-4000-8000-000000000001
 
 **Endpoint:**
 ```http
-GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000004&warehouseId=WAREHOUSE001&territory=56
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000101&warehouseId=WAREHOUSE001&territory=56&placement=DESKTOP
 ```
 
 **Purpose:** Fetches the customer dashboard layout for Haatza LITE quick commerce, featuring express delivery banners, daily essentials, and fresh produce.
@@ -1406,10 +1406,10 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000004&w
 | Parameter | Required | Data Type | Default | Description & Validation Behavior |
 |---|:---:|---|:---:|---|
 | `module` | **Yes** | `string` | — | Dashboard module identifier. Must be strictly `LITE` (case-insensitive). Missing, invalid, or legacy values reject with HTTP 400 Bad Request. |
-| `categoryId` | No | `string` | — | Category UUID (e.g. `c4000000-0000-4000-8000-000000000004` for Grocery). Filters widgets configured with a category match while preserving all layout banner slots. Accepts a string value; does not perform strict database existence validation. A non-matching category ID does **not** return HTTP 400; unassigned/banner widgets are preserved, and non-matching product shelves are omitted or return `items: []` with `total_items: 0`. |
-| `warehouseId` | No | `string` | — | Dark store warehouse identifier (e.g. `WAREHOUSE001`). Accepts a string value; does not perform strict warehouse existence validation. A non-existent warehouse ID does **not** return HTTP 400; widgets configured with warehouse IDs `''` or `'ALL'` are still returned. |
-| `territory` | No | `string` | `ALL` | PIN-code prefix for one of the 28 states of India (e.g. `56` for Bengaluru / Karnataka) or `ALL`. Invalid state prefixes throw HTTP 400 Bad Request. |
-| `placement` | No | `string` | `HOME` | Layout placement filter (e.g. `HOME`). |
+| `categoryId` | **Yes** | `string` | — | Category UUID. Filters widgets configured with a category match. Missing or empty category ID rejects with HTTP 400 Bad Request. |
+| `warehouseId` | **Yes** | `string` | — | Dark store warehouse identifier (e.g. `WAREHOUSE001`). Required for LITE module. Missing warehouse ID rejects with HTTP 400 Bad Request. |
+| `territory` | **Yes** | `string` | — | Exact 2-digit state PIN-code prefix (e.g. `56` for Karnataka). Missing or invalid non-2-digit values reject with HTTP 400 Bad Request. |
+| `placement` | **Yes** | `string` | — | Layout placement filter. Must be strictly `DESKTOP` or `MOBILE` (case-sensitive uppercase). Missing or invalid values reject with HTTP 400 Bad Request. |
 
 **Configured Widgets:** Configured widgets `W017` through `W023` (sequence 1–7). When filtered by category `c4000000-0000-4000-8000-000000000004`, 6 matching widgets (`W017`–`W022`) are returned. When `categoryId` is omitted, all 7 widgets (`W017`–`W023`) are returned.
 
@@ -2001,7 +2001,7 @@ GET /api/dashboard?module=SHOPPING
 
 ### 4. Invalid `territory` PIN Prefix (`400 Bad Request`)
 ```http
-GET /api/dashboard?module=HAATZA&territory=99
+GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=99&placement=DESKTOP
 ```
 ```json
 {
@@ -2010,7 +2010,41 @@ GET /api/dashboard?module=HAATZA&territory=99
   "errors": [
     {
       "field": "territory",
-      "message": "Invalid territory code. Must be a valid 2-digit PIN code prefix (e.g., 56 for Karnataka, 11 for Delhi) matching one of the 28 Indian States, or ALL"
+      "message": "territory must be exactly 2 digits. Received: '99'"
+    }
+  ]
+}
+```
+
+### 5. Missing `placement` Query Parameter (`400 Bad Request`)
+```http
+GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56
+```
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "placement",
+      "message": "placement is required. Allowed values: 'DESKTOP', 'MOBILE'"
+    }
+  ]
+}
+```
+
+### 6. Invalid or Lowercase `placement` Query Parameter (`400 Bad Request`)
+```http
+GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56&placement=desktop
+```
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errors": [
+    {
+      "field": "placement",
+      "message": "placement must be either 'DESKTOP' or 'MOBILE'. Received: 'desktop'"
     }
   ]
 }

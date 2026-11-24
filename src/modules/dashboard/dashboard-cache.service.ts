@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { CACHE_DEFAULTS } from './dashboard.config';
+import { CACHE_DEFAULTS, ALLOWED_PLACEMENTS, type AllowedPlacement } from './dashboard.config';
 
 interface CacheEntry<T> {
   data: T;
@@ -23,18 +23,25 @@ export class DashboardCacheService {
 
   /**
    * Builds the standardized cache key
-   * - HAATZA: dashboard:HAATZA:<categoryId>:<territory>
-   * - LITE:   dashboard:LITE:<categoryId>:<territory>:<warehouseId>
+   * - HAATZA: dashboard:HAATZA:<placement>:<categoryId>:<territory>
+   * - LITE:   dashboard:LITE:<placement>:<categoryId>:<territory>:<warehouseId>
    */
-  public buildKey(module: string, categoryId: string, territory: string, warehouseId?: string): string {
+  public buildKey(
+    module: string,
+    placement: string,
+    categoryId: string,
+    territory: string,
+    warehouseId?: string,
+  ): string {
     const mod = module.toUpperCase().trim();
+    const plc = placement.toUpperCase().trim();
     const cat = categoryId.trim();
     const ter = territory.trim();
     if (mod === 'LITE') {
       const wh = (warehouseId || '').trim();
-      return `dashboard:LITE:${cat}:${ter}:${wh}`;
+      return `dashboard:LITE:${plc}:${cat}:${ter}:${wh}`;
     }
-    return `dashboard:HAATZA:${cat}:${ter}`;
+    return `dashboard:HAATZA:${plc}:${cat}:${ter}`;
   }
 
   /**
@@ -108,13 +115,16 @@ export class DashboardCacheService {
   }
 
   /**
-   * Invalidates all cache keys for a given module and category
+   * Invalidates all cache keys for a given module and category across all allowed placements.
    */
   public invalidateCategory(module: string, categoryId: string): void {
-    const prefix = `dashboard:${module.toUpperCase().trim()}:${categoryId.trim()}:`;
+    const mod = module.toUpperCase().trim();
+    const cat = categoryId.trim();
     for (const key of this.cache.keys()) {
-      if (key.startsWith(prefix)) {
-        this.cache.delete(key);
+      for (const plc of ALLOWED_PLACEMENTS) {
+        if (key.startsWith(`dashboard:${mod}:${plc}:${cat}:`)) {
+          this.cache.delete(key);
+        }
       }
     }
   }
