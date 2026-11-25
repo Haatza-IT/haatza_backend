@@ -10,6 +10,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { DashboardCacheService } from './dashboard-cache.service';
 import { formatDashboardResponse } from './dashboard-formatter.util';
 import { ALLOWED_PLACEMENTS, isAllowedPlacement, isIndianStateCode } from './dashboard.config';
+import { validatePaginationParams } from './dashboard.schema';
 import { sanitizeNulls } from '../../common/utils/null-sanitizer.util';
 import type {
   CreateDashboardDto,
@@ -112,6 +113,9 @@ export class DashboardService {
       throw new BadRequestException('warehouseId is required for LITE module');
     }
 
+    // Validate pagination params
+    const pagination = validatePaginationParams(query.page, query.limit);
+
     // 2. Build cache key
     const cacheKey = this.cacheService.buildKey(
       rawModule,
@@ -119,6 +123,8 @@ export class DashboardService {
       categoryId,
       territory,
       warehouseId,
+      pagination.page,
+      pagination.limit,
     );
 
     // 3. Query via cache loader with in-flight deduplication
@@ -180,8 +186,16 @@ export class DashboardService {
         (a, b) => a.sequence - b.sequence || a.widgetId.localeCompare(b.widgetId),
       );
 
-      // Format response with default values and clean envelope
-      return formatDashboardResponse(rawModule, categoryId, territory, deduplicatedRecords, warehouseId);
+      // Format response with default values, clean envelope, and optional pagination
+      return formatDashboardResponse(
+        rawModule,
+        categoryId,
+        territory,
+        deduplicatedRecords,
+        warehouseId,
+        pagination.page,
+        pagination.limit,
+      );
     });
   }
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { BadRequestException } from '@nestjs/common';
 import {
   ALLOWED_PLACEMENTS,
   isAllowedPlacement,
@@ -8,6 +9,7 @@ import {
   type IndianStateCode,
   LITE_WAREHOUSES,
   isLiteWarehouseId,
+  PAGINATION_DEFAULTS,
 } from './dashboard.config';
 
 /**
@@ -214,12 +216,85 @@ export const updateDashboardSchema = z
 export type UpdateDashboardInput = z.infer<typeof updateDashboardSchema>;
 
 /**
+ * Strict validator for optional customer pagination parameters:
+ * - opt-in: if neither page nor limit is sent, returns {} (unpaginated)
+ * - if page and/or limit is sent: page defaults to 1, limit defaults to 20
+ * - limit alone is allowed (page defaults to 1)
+ * - invalid page/limit (0, negative, decimal, text, empty, limit > 50, duplicate array): 400
+ */
+export function validatePaginationParams(rawPage: any, rawLimit: any): { page?: number; limit?: number } {
+  if (Array.isArray(rawPage)) {
+    throw new BadRequestException('page parameter cannot be duplicated');
+  }
+  if (Array.isArray(rawLimit)) {
+    throw new BadRequestException('limit parameter cannot be duplicated');
+  }
+
+  const hasPage = rawPage !== undefined && rawPage !== null && String(rawPage).trim() !== '';
+  const hasLimit = rawLimit !== undefined && rawLimit !== null && String(rawLimit).trim() !== '';
+
+  if (rawPage !== undefined && !hasPage) {
+    throw new BadRequestException('page must be an integer >= 1');
+  }
+  if (rawLimit !== undefined && !hasLimit) {
+    throw new BadRequestException('limit must be an integer between 1 and 50');
+  }
+
+  // "No params" branch: if NEITHER page NOR limit is sent, return empty object (opt-in pagination)
+  if (!hasPage && !hasLimit) {
+    return {};
+  }
+
+  let pageNum: number = PAGINATION_DEFAULTS.DEFAULT_PAGE;
+  if (hasPage) {
+    if (typeof rawPage === 'number') {
+      if (!Number.isInteger(rawPage) || rawPage < 1) {
+        throw new BadRequestException('page must be an integer >= 1');
+      }
+      pageNum = rawPage;
+    } else if (typeof rawPage === 'string') {
+      const trimmed = rawPage.trim();
+      if (!/^[1-9]\d*$/.test(trimmed)) {
+        throw new BadRequestException('page must be an integer >= 1');
+      }
+      pageNum = parseInt(trimmed, 10);
+    } else {
+      throw new BadRequestException('page must be an integer >= 1');
+    }
+  }
+
+  let limitNum: number = PAGINATION_DEFAULTS.DEFAULT_LIMIT;
+  if (hasLimit) {
+    if (typeof rawLimit === 'number') {
+      if (!Number.isInteger(rawLimit) || rawLimit < PAGINATION_DEFAULTS.MIN_LIMIT || rawLimit > PAGINATION_DEFAULTS.MAX_LIMIT) {
+        throw new BadRequestException(`limit must be an integer between ${PAGINATION_DEFAULTS.MIN_LIMIT} and ${PAGINATION_DEFAULTS.MAX_LIMIT}`);
+      }
+      limitNum = rawLimit;
+    } else if (typeof rawLimit === 'string') {
+      const trimmed = rawLimit.trim();
+      if (!/^[1-9]\d*$/.test(trimmed)) {
+        throw new BadRequestException(`limit must be an integer between ${PAGINATION_DEFAULTS.MIN_LIMIT} and ${PAGINATION_DEFAULTS.MAX_LIMIT}`);
+      }
+      limitNum = parseInt(trimmed, 10);
+      if (limitNum < PAGINATION_DEFAULTS.MIN_LIMIT || limitNum > PAGINATION_DEFAULTS.MAX_LIMIT) {
+        throw new BadRequestException(`limit must be an integer between ${PAGINATION_DEFAULTS.MIN_LIMIT} and ${PAGINATION_DEFAULTS.MAX_LIMIT}`);
+      }
+    } else {
+      throw new BadRequestException(`limit must be an integer between ${PAGINATION_DEFAULTS.MIN_LIMIT} and ${PAGINATION_DEFAULTS.MAX_LIMIT}`);
+    }
+  }
+
+  return { page: pageNum, limit: limitNum };
+}
+
+/**
  * Strict Customer Dashboard Query Schema
  * Validates requirements before hitting cache or database:
  * - module must be HAATZA or LITE
  * - categoryId must be present
- * - territory must be present and exactly 2 digits
+ * - territory must be present and a valid Indian state code
  * - For LITE, warehouseId must be present
+ * - page & limit: optional pagination for "Category Products"
  */
 export const customerDashboardQuerySchema = z
   .object({
@@ -236,10 +311,10 @@ export const customerDashboardQuerySchema = z
         z.string().transform((v) => v.toLowerCase() === 'true' || v === '1'),
       ])
       .optional(),
-    limit: z.coerce.number().optional(),
-    skip: z.coerce.number().optional(),
-    page: z.coerce.number().optional(),
-    sequence: z.coerce.number().optional(),
+    limit: z.any().optional(),
+    skip: z.any().optional(),
+    page: z.any().optional(),
+    sequence: z.any().optional(),
     status: z
       .union([
         z.boolean(),
@@ -337,20 +412,48 @@ export const customerDashboardQuerySchema = z
         });
       }
     }
+
+    // 6. Pagination check: page and limit
+    if (data.page !== undefined || data.limit !== undefined) {
+      try {
+        validatePaginationParams(data.page, data.limit);
+      } catch (err: any) {
+        const errorPath = err.message.toLowerCase().includes('limit') ? 'limit' : 'page';
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [errorPath],
+          message: err.message,
+        });
+      }
+    }
   })
-  .transform((data) => ({
-    module: (data.module || '').toUpperCase() as 'HAATZA' | 'LITE',
-    categoryId: (data.categoryId || data.category_id || '').trim(),
-    territory: (data.territory || '').trim(),
-    placement: (data.placement || '').trim() as AllowedPlacement,
-    warehouseId: (data.warehouseId || data.warehouse_id || '').trim(),
-    raw: Boolean(data.raw),
-    limit: data.limit,
-    skip: data.skip,
-    page: data.page,
-    sequence: data.sequence,
-    status: data.status,
-  }));
+  .transform((data) => {
+    let pageNum: number | undefined;
+    let limitNum: number | undefined;
+    if (!data.raw) {
+      try {
+        const pag = validatePaginationParams(data.page, data.limit);
+        pageNum = pag.page;
+        limitNum = pag.limit;
+      } catch {
+        // Handled in superRefine
+      }
+    }
+
+    return {
+      module: (data.module || '').toUpperCase() as 'HAATZA' | 'LITE',
+      categoryId: (data.categoryId || data.category_id || '').trim(),
+      territory: (data.territory || '').trim(),
+      placement: (data.placement || '').trim() as AllowedPlacement,
+      warehouseId: (data.warehouseId || data.warehouse_id || '').trim(),
+      raw: Boolean(data.raw),
+      limit: limitNum,
+      skip: data.skip,
+      page: pageNum,
+      sequence: data.sequence,
+      status: data.status,
+    };
+  });
 
 export type CustomerDashboardQueryInput = z.infer<typeof customerDashboardQuerySchema>;
 

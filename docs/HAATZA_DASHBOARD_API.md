@@ -26,6 +26,8 @@ GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101
 | `categoryId` | **Yes** | `string` | — | Category UUID (e.g. `c4000000-0000-4000-8000-000000000101` for All, `c4000000-0000-4000-8000-000000000102` for Men's Fashion, `c4000000-0000-4000-8000-000000000104` for Electronics). Filters layout widgets and items to the requested category. Missing or empty category ID rejects with HTTP 400 Bad Request. |
 | `territory` | **Yes** | `string` | — | Exact 2-letter uppercase Indian state code (one of the 28 supported Indian states: `AP, AR, AS, BR, CG, GA, GJ, HR, HP, JH, KA, KL, MP, MH, MN, ML, MZ, NL, OD, PB, RJ, SK, TN, TS, TR, UP, UK, WB`). Missing, numeric PIN codes (e.g. `56`, `560001`), lowercase (`ap`), `ALL`, or non-state strings reject with HTTP 400 Bad Request. |
 | `placement` | **Yes** | `string` | — | Layout placement filter. Must be strictly `DESKTOP` or `MOBILE` (case-sensitive uppercase). Missing or invalid values reject with HTTP 400 Bad Request. |
+| `page` | No (Opt-in) | `integer` | — | 1-based page number (integer $\ge 1$). When neither `page` nor `limit` is sent, pagination is NOT enabled (all items returned in full with NO pagination object). When opt-in pagination is triggered by sending `page` and/or `limit`, `page` defaults to 1. Invalid values ($\le 0$, decimals, strings, empty, duplicates) reject with HTTP 400 Bad Request. |
+| `limit` | No (Opt-in) | `integer` | — | Items per page (integer 1 to 50). When neither `page` nor `limit` is sent, pagination is NOT enabled (all items returned in full with NO pagination object). When opt-in pagination is triggered, `limit` defaults to 20. Allowed alone (page defaults to 1). Values $< 1$ or $> 50$, decimals, strings, empty, or duplicate parameters reject with HTTP 400 Bad Request. |
 
 ### Approved 18 HAATZA Categories
 
@@ -988,6 +990,8 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&w
 | `warehouseId` | **Yes** | `string` | — | Dark store warehouse identifier. Must be one of the 5 supported dark-store warehouses: `WAREHOUSE001`, `WAREHOUSE002`, `WAREHOUSE003`, `WAREHOUSE004`, `WAREHOUSE005`. Required for LITE module. Missing or invalid warehouse ID rejects with HTTP 400 Bad Request. |
 | `territory` | **Yes** | `string` | — | Exact 2-letter uppercase Indian state code (one of the 28 supported Indian states: `AP, AR, AS, BR, CG, GA, GJ, HR, HP, JH, KA, KL, MP, MH, MN, ML, MZ, NL, OD, PB, RJ, SK, TN, TS, TR, UP, UK, WB`). Missing, numeric PIN codes (e.g. `56`, `560001`), lowercase (`ap`), `ALL`, or non-state strings reject with HTTP 400 Bad Request. |
 | `placement` | **Yes** | `string` | — | Layout placement filter. Must be strictly `DESKTOP` or `MOBILE` (case-sensitive uppercase). Missing or invalid values reject with HTTP 400 Bad Request. |
+| `page` | No (Opt-in) | `integer` | — | 1-based page number (integer $\ge 1$). When neither `page` nor `limit` is sent, pagination is NOT enabled (all items returned in full with NO pagination object). When opt-in pagination is triggered by sending `page` and/or `limit`, `page` defaults to 1. Invalid values ($\le 0$, decimals, strings, empty, duplicates) reject with HTTP 400 Bad Request. |
+| `limit` | No (Opt-in) | `integer` | — | Items per page (integer 1 to 50). When neither `page` nor `limit` is sent, pagination is NOT enabled (all items returned in full with NO pagination object). When opt-in pagination is triggered, `limit` defaults to 20. Allowed alone (page defaults to 1). Values $< 1$ or $> 50$, decimals, strings, empty, or duplicate parameters reject with HTTP 400 Bad Request. |
 
 ### Approved 12 LITE Categories
 
@@ -1053,18 +1057,410 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&w
 
 ---
 
-## 3. Architecture, Caching & Admin Security
+## 3. Opt-In Widget Pagination Specification
+
+### 3.1 Overview & Scope
+Pagination on customer dashboard endpoints is strictly **OPT-IN**, dynamic, and applies to ANY widget across both HAATZA and LITE modules without hard-coding:
+- **Default (No Parameters):** When NEITHER `page` NOR `limit` is passed, the API returns **ALL** items of every widget in full with **NO** `pagination` metadata object, exactly matching legacy pre-pagination behavior.
+- **Opt-In Trigger:** When `page` and/or `limit` is passed in the request query:
+  - **Dynamic Slicing for Long Widgets:** Every widget whose `items` count exceeds the effective `limit` (default 20, max 50) is sliced in memory to `((page - 1) * limit, page * limit)` and receives a `pagination` metadata object.
+  - **Short Widgets Unchanged:** Every widget whose `items` count is $\le \text{limit}$ is returned in full with NO `pagination` field attached.
+  - **Page Beyond Last Page:** When a requested `page` exceeds `total_pages` for a long widget, the API returns HTTP 200 OK with `items: []`, `returned: 0`, `has_next: false`, `has_prev: true`. Widgets with items $\le \text{limit}$ remain returned in full on any page.
+- **Defaults When Opted-In:**
+  - `page` defaults to `1`
+  - `limit` defaults to `20`
+  - `limit` alone is allowed (e.g. `?limit=20` activates pagination with `page=1`)
+  - `page` alone is allowed (e.g. `?page=2` activates pagination with `limit=20`)
+- **Execution Layer:** Slicing is performed purely in memory at the response formatting layer after database retrieval, territory selection, sequence ordering, and null-default normalization. Database queries and item sequences remain unmodified.
+- **Clean Envelopes:** Zero null values anywhere in customer envelopes or pagination metadata.
+
+### 3.2 Query Parameters & Validation Rules
+
+| Parameter | Type | Default (when opted-in) | Constraints & Validation Behavior |
+|---|---|---|---|
+| `page` | `integer` | `1` | 1-based page number (integer $\ge 1$). When omitted along with `limit`, pagination is disabled. When opt-in pagination is triggered, defaults to 1. Values $< 1$, decimals (`1.5`), strings (`abc`), empty strings, or duplicate parameters reject with **HTTP 400 Bad Request**. |
+| `limit` | `integer` | `20` | Items per page (integer 1 to 50). When omitted along with `page`, pagination is disabled. When opt-in pagination is triggered, defaults to 20. Allowed alone (`page` defaults to 1). Values $< 1$ or $> 50$, decimals, strings, empty, or duplicate parameters reject with **HTTP 400 Bad Request**. |
+
+### 3.3 Pagination Object Structure
+When opt-in pagination is active and a widget has more items than `limit`, a `pagination` metadata object is attached directly inside that widget object:
+
+```json
+{
+  "page": 1,
+  "limit": 20,
+  "total_items": 30,
+  "total_pages": 2,
+  "returned": 20,
+  "has_next": true,
+  "has_prev": false
+}
+```
+
+- `page`: Current 1-based page number (default 1).
+- `limit`: Number of items per page (1 to 50, default 20).
+- `total_items`: Total number of items in the full unpaginated widget list.
+- `total_pages`: Total number of pages calculated as `Math.ceil(total_items / limit)`.
+- `returned`: Exact count of items returned in the current `items` array.
+- `has_next`: `true` if `page < total_pages`, else `false`.
+- `has_prev`: `true` if `page > 1`, else `false`.
+
+---
+
+### 3.4 Real Local Response Examples
+
+#### Example 1: LITE Category 202 — Default (No Parameters: Opt-In Disabled, All 30 Items, No Pagination Field)
+**Request:**
+```http
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001
+```
+**Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "module": "LITE",
+  "categoryId": "c4000000-0000-4000-8000-000000000202",
+  "territory": "AP",
+  "count": 2,
+  "widgets": [
+    {
+      "widget_id": "w0177",
+      "widget_name": "Hero Banner",
+      "sequence": 1,
+      "widget_redirect_to": "NONE",
+      "redirect_category_id": "",
+      "redirect_product_id": "",
+      "items": [
+        {
+          "banner_image": "https://i.pinimg.com/736x/ff/5d/a3/ff5da3ca53789e33510f3c7bf32894a2.jpg",
+          "title": "Fresh Fruits",
+          "content": "Enjoy fresh and juicy fruits at great prices",
+          "redirect_category_id": "c4000000-0000-4000-8000-000000000202",
+          "redirect_url": ""
+        },
+        {
+          "banner_image": "https://i.pinimg.com/736x/29/98/9c/29989ca64ca7277e382d5a3eb175b9ca.jpg",
+          "title": "Fresh Vegetables",
+          "content": "Shop fresh vegetables picked daily for your healthy meals",
+          "redirect_category_id": "c4000000-0000-4000-8000-000000000202",
+          "redirect_url": ""
+        }
+      ]
+    },
+    {
+      "widget_id": "w0178",
+      "widget_name": "Category Products",
+      "sequence": 2,
+      "widget_redirect_to": "NONE",
+      "redirect_category_id": "",
+      "redirect_product_id": "",
+      "items": [
+        {
+          "product_id": "lp-2001",
+          "product_title": "Fresh Apple 500g",
+          "product_image": "https://i.pinimg.com/736x/c5/42/41/c54241e779a5e12ca0fb4660ebbc48ff.jpg",
+          "category_id": "c4000000-0000-4000-8000-000000000202",
+          "mrp": 120,
+          "discount_price": 99,
+          "discount_percentage": 17,
+          "is_add_to_cart": true
+        },
+        "... 29 additional products returned in full (30 items total) with NO pagination field ..."
+      ]
+    }
+  ],
+  "warehouseId": "WAREHOUSE001"
+}
+```
+
+#### Example 2: LITE Category 202 — Opt-In Page 1 (`page=1` or `limit=20`: First 20 of 30 Items with Pagination)
+**Request:**
+```http
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&page=1
+```
+**Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "module": "LITE",
+  "categoryId": "c4000000-0000-4000-8000-000000000202",
+  "territory": "AP",
+  "count": 2,
+  "widgets": [
+    {
+      "widget_id": "w0177",
+      "widget_name": "Hero Banner",
+      "sequence": 1,
+      "items": [ "...2 banner items (<= 20, no pagination)..." ]
+    },
+    {
+      "widget_id": "w0178",
+      "widget_name": "Category Products",
+      "sequence": 2,
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total_items": 30,
+        "total_pages": 2,
+        "returned": 20,
+        "has_next": true,
+        "has_prev": false
+      },
+      "items": [ "...first 20 products (lp-2001 to lp-2020)..." ]
+    }
+  ],
+  "warehouseId": "WAREHOUSE001"
+}
+```
+
+#### Example 2: LITE Category 202 — Page 2 (Remaining 10 Items)
+**Request:**
+```http
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&page=2
+```
+**Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "module": "LITE",
+  "categoryId": "c4000000-0000-4000-8000-000000000202",
+  "territory": "AP",
+  "count": 2,
+  "widgets": [
+    {
+      "widget_id": "w0177",
+      "widget_name": "Hero Banner",
+      "sequence": 1,
+      "widget_redirect_to": "NONE",
+      "redirect_category_id": "",
+      "redirect_product_id": "",
+      "items": [
+        {
+          "banner_image": "https://i.pinimg.com/736x/ff/5d/a3/ff5da3ca53789e33510f3c7bf32894a2.jpg",
+          "title": "Fresh Fruits",
+          "content": "Enjoy fresh and juicy fruits at great prices",
+          "redirect_category_id": "c4000000-0000-4000-8000-000000000202",
+          "redirect_url": ""
+        },
+        {
+          "banner_image": "https://i.pinimg.com/736x/29/98/9c/29989ca64ca7277e382d5a3eb175b9ca.jpg",
+          "title": "Fresh Vegetables",
+          "content": "Shop fresh vegetables picked daily for your healthy meals",
+          "redirect_category_id": "c4000000-0000-4000-8000-000000000202",
+          "redirect_url": ""
+        }
+      ]
+    },
+    {
+      "widget_id": "w0178",
+      "widget_name": "Category Products",
+      "sequence": 2,
+      "widget_redirect_to": "NONE",
+      "redirect_category_id": "",
+      "redirect_product_id": "",
+      "pagination": {
+        "page": 2,
+        "limit": 20,
+        "total_items": 30,
+        "total_pages": 2,
+        "returned": 10,
+        "has_next": false,
+        "has_prev": true
+      },
+      "items": [
+        {
+          "product_id": "lp-2021",
+          "product_title": "Fresh Mint Leaves 100g",
+          "product_image": "https://i.pinimg.com/736x/f6/c8/10/f6c81005ca657f2025178619623832c0.jpg",
+          "category_id": "c4000000-0000-4000-8000-000000000202",
+          "mrp": 20,
+          "discount_price": 15,
+          "discount_percentage": 25,
+          "is_add_to_cart": true
+        }
+      ]
+    }
+  ],
+  "warehouseId": "WAREHOUSE001"
+}
+```
+
+#### Example 3: LITE Category 202 — Page 3 (Beyond Last Page)
+**Request:**
+```http
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=MOBILE&warehouseId=WAREHOUSE003&page=3
+```
+**Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "module": "LITE",
+  "categoryId": "c4000000-0000-4000-8000-000000000202",
+  "territory": "AP",
+  "count": 2,
+  "widgets": [
+    {
+      "widget_id": "w0322",
+      "widget_name": "Hero Banner",
+      "sequence": 1,
+      "widget_redirect_to": "NONE",
+      "redirect_category_id": "",
+      "redirect_product_id": "",
+      "items": [
+        {
+          "banner_image": "https://i.pinimg.com/736x/ff/5d/a3/ff5da3ca53789e33510f3c7bf32894a2.jpg",
+          "title": "Fresh Fruits",
+          "content": "Enjoy fresh and juicy fruits at great prices",
+          "redirect_category_id": "c4000000-0000-4000-8000-000000000202",
+          "redirect_url": ""
+        },
+        {
+          "banner_image": "https://i.pinimg.com/736x/29/98/9c/29989ca64ca7277e382d5a3eb175b9ca.jpg",
+          "title": "Fresh Vegetables",
+          "content": "Shop fresh vegetables picked daily for your healthy meals",
+          "redirect_category_id": "c4000000-0000-4000-8000-000000000202",
+          "redirect_url": ""
+        }
+      ]
+    },
+    {
+      "widget_id": "w0323",
+      "widget_name": "Category Products",
+      "sequence": 2,
+      "widget_redirect_to": "NONE",
+      "redirect_category_id": "",
+      "redirect_product_id": "",
+      "pagination": {
+        "page": 3,
+        "limit": 20,
+        "total_items": 30,
+        "total_pages": 2,
+        "returned": 0,
+        "has_next": false,
+        "has_prev": true
+      },
+      "items": []
+    }
+  ],
+  "warehouseId": "WAREHOUSE003"
+}
+```
+
+#### Example 4: LITE Category 202 — Full Catalog (`limit=50`)
+**Request:**
+```http
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&limit=50
+```
+**Response (`200 OK`):**
+```json
+{
+  "success": true,
+  "module": "LITE",
+  "categoryId": "c4000000-0000-4000-8000-000000000202",
+  "territory": "AP",
+  "count": 2,
+  "widgets": [
+    {
+      "widget_id": "w0177",
+      "widget_name": "Hero Banner",
+      "sequence": 1,
+      "items": [ "...2 banner items..." ]
+    },
+    {
+      "widget_id": "w0178",
+      "widget_name": "Category Products",
+      "sequence": 2,
+      "items": [ "...all 30 product items..." ]
+    }
+  ],
+  "warehouseId": "WAREHOUSE001"
+}
+```
+*(Notice: Because `total_items` (30) $\le \text{limit}$ (50), `Category Products` is returned in full with NO `pagination` field.)*
+
+#### Example 5: HAATZA Category 101 (All Widgets $\le 20$ Items)
+**Request:**
+```http
+GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=AP&placement=DESKTOP
+```
+**Response (`200 OK`):**
+- Returns all 16 widgets in sequence order (1..16).
+- All widgets have item counts between 1 and 8 ($\le 20$).
+- All 16 widgets are returned in full with NO `pagination` field.
+
+#### Example 6: Validation Errors (`400 Bad Request`)
+
+1. **Limit exceeds 50 (`limit=51`):**
+   ```http
+   GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&limit=51
+   ```
+   **Response (`400 Bad Request`):**
+   ```json
+   {
+     "success": false,
+     "message": "Validation failed",
+     "errors": [
+       {
+         "path": "limit",
+         "message": "limit must be an integer between 1 and 50"
+       }
+     ]
+   }
+   ```
+
+2. **Invalid page (`page=0`):**
+   ```http
+   GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=MOBILE&warehouseId=WAREHOUSE001&page=0
+   ```
+   **Response (`400 Bad Request`):**
+   ```json
+   {
+     "success": false,
+     "message": "Validation failed",
+     "errors": [
+       {
+         "path": "page",
+         "message": "page must be an integer >= 1"
+       }
+     ]
+   }
+   ```
+
+3. **Duplicate parameter (`page=1&page=2`):**
+   ```http
+   GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&page=1&page=2
+   ```
+   **Response (`400 Bad Request`):**
+   ```json
+   {
+     "success": false,
+     "message": "Validation failed",
+     "errors": [
+       {
+         "path": "page",
+         "message": "page parameter cannot be duplicated"
+       }
+     ]
+   }
+   ```
+
+---
+
+## 4. Architecture, Caching & Admin Security
 
 ### In-Memory LRU Cache Architecture
 - **Engine:** In-memory Least Recently Used (`Map`-based) cache with O(1) reads, writes, and eviction.
 - **Capacity:** Maximum 500 keys (`maxEntries: 500`).
 - **TTL:** 300 seconds (5 minutes) per entry.
 - **LRU Policy:** On every cache hit (`get`), the key is re-inserted to mark it as Most Recently Used. When cache exceeds 500 entries on insertion, the Least Recently Used (oldest accessed) key is evicted.
-- **Standardized Key Structures:**
-  - **HAATZA:** `dashboard:HAATZA:<placement>:<categoryId>:<territory>` (strictly isolated per placement)
-  - **LITE:** `dashboard:LITE:<placement>:<categoryId>:<territory>:<warehouseId>` (strictly isolated per placement and dark-store warehouse)
+- **Standardized Key Structures (Opt-In Pagination Aware):**
+  - **Unpaginated (No page/limit sent):** Original format without `:p/:l` suffix:
+    - **HAATZA:** `dashboard:HAATZA:<placement>:<categoryId>:<territory>`
+    - **LITE:** `dashboard:LITE:<placement>:<categoryId>:<territory>:<warehouseId>`
+  - **Paginated (When page and/or limit is sent):** Format with `:p<page>:l<limit>` suffix:
+    - **HAATZA:** `dashboard:HAATZA:<placement>:<categoryId>:<territory>:p<page>:l<limit>`
+    - **LITE:** `dashboard:LITE:<placement>:<categoryId>:<territory>:<warehouseId>:p<page>:l<limit>`
 - **Stampede Prevention:** In-flight promise deduplication ensures multiple concurrent misses share a single database lookup.
-- **Invalidation:** Category invalidation loops across `ALLOWED_PLACEMENTS` (`DESKTOP`, `MOBILE`) to flush all views in one pass.
+- **Invalidation:** Category invalidation loops across `ALLOWED_PLACEMENTS` (`DESKTOP`, `MOBILE`) and clears both unpaginated and all paginated variants (`:p*:l*`) of the category simultaneously.
 
 ### Admin Authentication & Security
 - **Authentication Method:** Administrative endpoints require authentication via `x-admin-key: <ADMIN_API_KEY>` header or `Authorization: Bearer <ADMIN_API_KEY>`.

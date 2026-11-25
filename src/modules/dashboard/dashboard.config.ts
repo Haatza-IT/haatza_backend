@@ -255,3 +255,12 @@ export const CACHE_DEFAULTS = {
   TTL_SECONDS: parseInt(process.env.DASHBOARD_CACHE_TTL_SECONDS || '300', 10),
   MAX_ENTRIES: 500,
 };
+
+export const PAGINATION_DEFAULTS = {
+  DEFAULT_PAGE: 1,
+  DEFAULT_LIMIT: 20,
+  MIN_PAGE: 1,
+  MIN_LIMIT: 1,
+  MAX_LIMIT: 50,
+} as const;
+

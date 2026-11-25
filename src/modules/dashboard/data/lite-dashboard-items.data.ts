@@ -49,7 +49,68 @@ export const LITE_CAT201_HERO_BANNER_ITEMS: any[] = [
     "redirectType": "CATEGORY"
   }
 ];
-export const LITE_CAT201_EVERYDAY_ESSENTIALS_ITEMS: any[] = [];
+export const LITE_CAT201_EVERYDAY_ESSENTIALS_ITEMS: any[] = [
+  {
+    "product_id": "lp-3001",
+    "product_title": "Toned Milk 1L",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/0/0e/Milk_glass.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 66,
+    "discount_price": 60,
+    "discount_percentage": 9,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3002",
+    "product_title": "Brown Eggs 6 pcs",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/5/5e/Chicken_egg_2009-06-04.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 80,
+    "discount_price": 72,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3003",
+    "product_title": "Whole Wheat Atta 5kg",
+    "product_image": "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000209",
+    "mrp": 280,
+    "discount_price": 240,
+    "discount_percentage": 14,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3004",
+    "product_title": "Sona Masoori Rice 5kg",
+    "product_image": "https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000209",
+    "mrp": 400,
+    "discount_price": 350,
+    "discount_percentage": 13,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3005",
+    "product_title": "Sunflower Oil 1L",
+    "product_image": "https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000209",
+    "mrp": 160,
+    "discount_price": 140,
+    "discount_percentage": 13,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3006",
+    "product_title": "Iodised Salt 1kg",
+    "product_image": "https://images.unsplash.com/photo-1518110925495-5fe2fda0442c?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000209",
+    "mrp": 30,
+    "discount_price": 27,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  }
+];
 export const LITE_CAT201_DISPATCH_BELT_ITEMS: any[] = [
   {
     "id": "lite-dispatch-1",
@@ -86,8 +147,130 @@ export const LITE_CAT201_OFFER_BANNER_ITEMS: any[] = [
     "redirectType": "CAMPAIGN"
   }
 ];
-export const LITE_CAT201_FRUITS_GREENS_ITEMS: any[] = [];
-export const LITE_CAT201_HOUSEHOLD_HYGIENE_ITEMS: any[] = [];
+export const LITE_CAT201_FRUITS_GREENS_ITEMS: any[] = [
+  {
+    "product_id": "lp-3011",
+    "product_title": "Robusta Bananas 6 pcs",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/8/8a/Banana-Single.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 50,
+    "discount_price": 42,
+    "discount_percentage": 16,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3012",
+    "product_title": "Red Apples 4 pcs",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/1/15/Red_Apple.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 120,
+    "discount_price": 99,
+    "discount_percentage": 18,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3013",
+    "product_title": "Hybrid Tomato 500g",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/8/89/Tomato_je.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 40,
+    "discount_price": 32,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3014",
+    "product_title": "Onion 1kg",
+    "product_image": "https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 50,
+    "discount_price": 40,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3015",
+    "product_title": "Spinach Bunch",
+    "product_image": "https://images.unsplash.com/photo-1576045057995-568f588f82fb?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 30,
+    "discount_price": 24,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3016",
+    "product_title": "Coriander Bunch",
+    "product_image": "https://images.unsplash.com/photo-1596797882870-8c33deeac224?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 20,
+    "discount_price": 16,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  }
+];
+export const LITE_CAT201_HOUSEHOLD_HYGIENE_ITEMS: any[] = [
+  {
+    "product_id": "lp-3021",
+    "product_title": "Dishwash Liquid 500ml",
+    "product_image": "https://images.unsplash.com/photo-1585421514738-01798e348b17?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000205",
+    "mrp": 110,
+    "discount_price": 95,
+    "discount_percentage": 14,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3022",
+    "product_title": "Floor Cleaner 1L",
+    "product_image": "https://images.unsplash.com/photo-1584813470613-5b1c1cad3d69?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000205",
+    "mrp": 220,
+    "discount_price": 189,
+    "discount_percentage": 14,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3023",
+    "product_title": "Laundry Detergent Powder 1kg",
+    "product_image": "https://images.unsplash.com/photo-1582735689369-4fe89db7114c?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000205",
+    "mrp": 140,
+    "discount_price": 120,
+    "discount_percentage": 14,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3024",
+    "product_title": "Toilet Cleaner 500ml",
+    "product_image": "https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000205",
+    "mrp": 95,
+    "discount_price": 80,
+    "discount_percentage": 16,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3025",
+    "product_title": "Hand Wash Refill 750ml",
+    "product_image": "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000205",
+    "mrp": 130,
+    "discount_price": 110,
+    "discount_percentage": 15,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-3026",
+    "product_title": "Scrub Pad 3 pcs",
+    "product_image": "https://images.unsplash.com/photo-1583947215259-38e31be8751f?auto=format&fit=crop&w=600&q=80",
+    "category_id": "c4000000-0000-4000-8000-000000000205",
+    "mrp": 60,
+    "discount_price": 50,
+    "discount_percentage": 17,
+    "is_add_to_cart": true
+  }
+];
 
 // ============================================================================
 // 2. CATEGORIES 202 TO 212 - 22 CATEGORY WIDGETS (HERO BANNER & PRODUCTS)
@@ -95,78 +278,638 @@ export const LITE_CAT201_HOUSEHOLD_HYGIENE_ITEMS: any[] = [];
 
 export const LITE_FRUITS_AND_VEGETABLES_BANNER_ITEMS: any[] = [
   {
-    "banner_image": "https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=600&q=80",
-    "title": "Farm Fresh Fruits & Vegetables",
-    "content": "Handpicked fresh organic greens, crunchy apples & crisp veggies in 10 mins",
+    "banner_image": "https://i.pinimg.com/736x/ff/5d/a3/ff5da3ca53789e33510f3c7bf32894a2.jpg",
+    "title": "Fresh Fruits",
+    "content": "Enjoy fresh and juicy fruits at great prices",
     "redirect_category_id": "c4000000-0000-4000-8000-000000000202",
-    "redirect_url": "/lite/category/${c.catId}"
+    "redirect_url": ""
   },
   {
-    "banner_image": "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80",
-    "title": "Seasonal Organic Harvest Specials",
-    "content": "Up to 30% off farm direct pesticide-free seasonal produce",
+    "banner_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRqHk9rUod0s5Tib3eku3maTlqKRbrAf1wggQOemExyJw&s=10",
+    "title": "Fresh Vegetables",
+    "content": "Shop fresh and healthy vegetables delivered to your doorsteps",
     "redirect_category_id": "c4000000-0000-4000-8000-000000000202",
-    "redirect_url": "/lite/category/${c.catId}"
+    "redirect_url": ""
   }
 ];
 export const LITE_FRUITS_AND_VEGETABLES_PRODUCT_ITEMS: any[] = [
   {
-    "product_id": "l-0001",
-    "product_title": "Fresh Organic Royal Gala Apples (4 pcs, approx. 500g)",
-    "product_image": "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?auto=format&fit=crop&w=600&q=80",
+    "product_id": "lp-1001",
+    "product_title": "Apples",
+    "product_image": "https://marketplace.canva.com/Pk_Vc/MAFsWnPk_Vc/1/tl/canva-red-apple-fruit-MAFsWnPk_Vc.png",
     "category_id": "c4000000-0000-4000-8000-000000000202",
-    "mrp": 160,
-    "discount_price": 129,
-    "discount_percentage": 19,
+    "mrp": 60,
+    "discount_price": 49,
+    "discount_percentage": 18,
     "is_add_to_cart": true
   },
   {
-    "product_id": "l-0002",
-    "product_title": "Fresh Local Hybrid Tomato (1 kg Pack)",
-    "product_image": "https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=600&q=80",
+    "product_id": "lp-1002",
+    "product_title": "Banana",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/8/8a/Banana-Single.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 180,
+    "discount_price": 150,
+    "discount_percentage": 17,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1003",
+    "product_title": "Oranges",
+    "product_image": "https://media.gettyimages.com/id/185284489/photo/orange.jpg?s=612x612&w=gi&k=20&c=HZYbLyTgUgxD1WE-O-ltBo_Lui6pX6rQLHQJdYdyl_g=",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 100,
+    "discount_price": 90,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1004",
+    "product_title": "Grapes",
+    "product_image": "https://www.dole.com/sites/default/files/styles/1024w768h-80/public/media/2025-01/grapes.png?itok=YugivX6G-5BSFx78-",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 80,
+    "discount_price": 50,
+    "discount_percentage": 38,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1005",
+    "product_title": "Pomegranate",
+    "product_image": "https://images.ctfassets.net/2fp0gqefx40t/6thedjyTTErzkwTQ75DEVS/c667f3fe9af032cb7301ad495aa34019/ANPomegranateHeader.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 200,
+    "discount_price": 170,
+    "discount_percentage": 15,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1006",
+    "product_title": "Papaya",
+    "product_image": "https://tropicalexotics.in/cdn/shop/files/rn-image_picker_lib_temp_68579d65-b3ea-49c0-bab8-d5c6383f8362_2048x.png?v=1774677272",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 80,
+    "discount_price": 64,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1007",
+    "product_title": "Watermelon",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTLxJfIpTaHtDij3fP-keZgf0mjdHg0_5A2DaQcBiFlcsvjL_Ebd-RfuE4&s=10",
     "category_id": "c4000000-0000-4000-8000-000000000202",
     "mrp": 50,
-    "discount_price": 38,
-    "discount_percentage": 24,
+    "discount_price": 40,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1008",
+    "product_title": "Guava",
+    "product_image": "https://www.bbassets.com/media/uploads/p/l/40083741_3-fresho-guava-pink.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 90,
+    "discount_price": 72,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1009",
+    "product_title": "Pineapple",
+    "product_image": "https://www.bbassets.com/media/uploads/p/l/10000156_31-fresho-pineapple.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 70,
+    "discount_price": 56,
+    "discount_percentage": 20,
+    "is_add_to_cart": false
+  },
+  {
+    "product_id": "lp-1010",
+    "product_title": "Mango",
+    "product_image": "https://blog.bigbasket.com/wp-content/uploads/2026/04/Gemini_Generated_Image_1p7kwo1p7kwo1p7k.png",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 150,
+    "discount_price": 120,
+    "discount_percentage": 20,
+    "is_add_to_cart": false
+  },
+  {
+    "product_id": "lp-1011",
+    "product_title": "Tomato",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/8/89/Tomato_je.jpg?utm_source=en.wikipedia.org&utm_campaign=index&utm_content=original",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 40,
+    "discount_price": 32,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1012",
+    "product_title": "Potatoes",
+    "product_image": "https://images.ctfassets.net/0dkgxhks0leg/RKiZ605RAV8kjDQnxFCWP/b03b8729817c90b29b88d536bfd37ac5/9-Unusual-Uses-For-Potatoes.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 35,
+    "discount_price": 28,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1013",
+    "product_title": "Onions",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSYOmJ_fRqnB-L4vNFBIRRSQG4Xbw_zEqn4-Sjn2KryzQ&s",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 45,
+    "discount_price": 36,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1014",
+    "product_title": "Carrot",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQfFWZlC9wHFT2LNbjIgEwW8ynaWjqQGo4nV7qAknS8Ow&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 60,
+    "discount_price": 48,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1015",
+    "product_title": "Cucumber",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR-HExDQCDsrpfDyLJGFwwCaLng8qdeIUQlfIxYlDZ4eg&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 40,
+    "discount_price": 30,
+    "discount_percentage": 25,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1016",
+    "product_title": "Green Beans",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ-BdrvWbY26ExzQ3jCY4ibtGSeTvi-bawIGJZO9_dMkw&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 80,
+    "discount_price": 64,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1017",
+    "product_title": "Capsicum",
+    "product_image": "https://www.bbassets.com/media/uploads/p/l/10000067_27-fresho-capsicum-green.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 70,
+    "discount_price": 56,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1018",
+    "product_title": "Cauliflower",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ34uAdlCjfRTmItMo8B11jK24SWIQ9wkJ0SvovGrj2DA&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 50,
+    "discount_price": 40,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1019",
+    "product_title": "Broccoli",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQX0BQUYRkc1q8T9VOzTEdsMZjeogTOKOc6qxgmiNXdDw&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 120,
+    "discount_price": 96,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1020",
+    "product_title": "Mint",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQZUWcvebcnVKEKhNV6YDBAoIKmi6jlSdaOkQfdwxzgeQ&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 25,
+    "discount_price": 20,
+    "discount_percentage": 20,
+    "is_add_to_cart": false
+  },
+  {
+    "product_id": "lp-1021",
+    "product_title": "Spinach",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQLTLsGGBA2YLJCEMIiqFYpyGK0HKRjuPYtIkTjN60npA&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 30,
+    "discount_price": 24,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1022",
+    "product_title": "Coriander",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcShsWsDb347z0oGViTG7F9NtgCQaakaq7x01IQ2iyGJHA&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 20,
+    "discount_price": 16,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1023",
+    "product_title": "Green chillies",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSSMS13N_z6F143F1Ph5133iSDHLvZ5rAMGnqTYwLJbew&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 50,
+    "discount_price": 40,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1024",
+    "product_title": "Beetroot",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS2Ii3Ni04_MweHiZ1PPa5U4DgSAbyKJ8ydguUz1ynKdQ&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 45,
+    "discount_price": 36,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1025",
+    "product_title": "Radish",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRyN0soxecoPvbBbjGnpzuyFA7BPC5u-JYRa8g2cH_X2A&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 35,
+    "discount_price": 28,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1026",
+    "product_title": "Lemon",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSjv3wH66wuZAreBqsZasIwbaibPHh8IsuL992gB_YR1g&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 60,
+    "discount_price": 48,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1027",
+    "product_title": "Sweet corn",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSWC-4yBzGWSmnOqYVy2LDXVFpqzvd6-zBIfRnhAMR7tw&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 50,
+    "discount_price": 40,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1028",
+    "product_title": "Drumstick",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSGeqbSPx0YofWhyCal4MxEV4iqGC6PfCrh-WbVz3zL4A&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 70,
+    "discount_price": 56,
+    "discount_percentage": 20,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-1029",
+    "product_title": "Bottle Gourd",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT-TuIM2KZlS0lCXeoV-9JIuB4Gqsmry7YEcGPXeKIpsA&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 40,
+    "discount_price": 32,
+    "discount_percentage": 20,
+    "is_add_to_cart": false
+  },
+  {
+    "product_id": "lp-1030",
+    "product_title": "Cabbage",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT-TuIM2KZlS0lCXeoV-9JIuB4Gqsmry7YEcGPXeKIpsA&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000202",
+    "mrp": 35,
+    "discount_price": 28,
+    "discount_percentage": 20,
     "is_add_to_cart": true
   }
 ];
 
 export const LITE_DAILY_AND_BREAKFAST_BANNER_ITEMS: any[] = [
   {
-    "banner_image": "https://images.unsplash.com/photo-1528750997573-59b89d56f4f7?auto=format&fit=crop&w=600&q=80",
-    "title": "Morning Fresh Milk, Eggs & Bread",
-    "content": "Daily breakfast essentials delivered straight to your doorstep by 7 AM",
+    "banner_image": "https://i.pinimg.com/736x/74/07/fa/7407faebaf32aa8c177be37cde62a142.jpg",
+    "title": "Start Your Day with Fresh Breakfast",
+    "content": "Shop your favourite breakfast essentials in one place",
     "redirect_category_id": "c4000000-0000-4000-8000-000000000203",
-    "redirect_url": "/lite/category/${c.catId}"
+    "redirect_url": ""
   },
   {
-    "banner_image": "https://images.unsplash.com/photo-1586985289688-ca3cf47d3e6e?auto=format&fit=crop&w=600&q=80",
-    "title": "Healthy Cereals, Oats & Spreads",
-    "content": "Fuel your active day with wholesome oats, honey, muesli & butter",
+    "banner_image": "https://brownliving.in/cdn/shop/articles/daily-essentials-for-plastic-free-living-658203.jpg?v=1748069880",
+    "title": "Everyday Dairy Essentials",
+    "content": "Fresh milk, curd, butter and more for your daily needs",
     "redirect_category_id": "c4000000-0000-4000-8000-000000000203",
-    "redirect_url": "/lite/category/${c.catId}"
+    "redirect_url": ""
   }
 ];
 export const LITE_DAILY_AND_BREAKFAST_PRODUCT_ITEMS: any[] = [
   {
-    "product_id": "l-0003",
-    "product_title": "Amul Taaza Homogenised Toned Milk (1 Litre Tetra Pack)",
-    "product_image": "https://images.unsplash.com/photo-1550583724-b2692b85b150?auto=format&fit=crop&w=600&q=80",
+    "product_id": "lp-2001",
+    "product_title": "Fresh Milk 500ml",
+    "product_image": "https://rethinkrural.raydientrural.com/hubfs/Blog_Photos/Rural_Life/Food/Uses_for_milk_lead.jpg",
     "category_id": "c4000000-0000-4000-8000-000000000203",
-    "mrp": 72,
-    "discount_price": 68,
-    "discount_percentage": 6,
+    "mrp": 60,
+    "discount_price": 55,
+    "discount_percentage": 8,
     "is_add_to_cart": true
   },
   {
-    "product_id": "l-0004",
-    "product_title": "Kellogg's Corn Flakes Original Crispy Breakfast Cereal (500g Box)",
-    "product_image": "https://images.unsplash.com/photo-1521483451569-e33803c0330c?auto=format&fit=crop&w=600&q=80",
+    "product_id": "lp-2002",
+    "product_title": "Toned Milk 500ml",
+    "product_image": "https://cdn.grofers.com/cdn-cgi/image/f=auto,fit=scale-down,q=70,metadata=none,w=1080/da/cms-assets/cms/product/a538dae1-f4a3-49c9-aaf0-586b2855f825.png?bg_token=color.background.quaternary",
     "category_id": "c4000000-0000-4000-8000-000000000203",
-    "mrp": 225,
-    "discount_price": 185,
-    "discount_percentage": 18,
+    "mrp": 50,
+    "discount_price": 45,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2003",
+    "product_title": "Full Cream Milk 500ml",
+    "product_image": "https://m.media-amazon.com/images/I/61xRQ6AmscL._AC_UF894,1000_QL80_.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 35,
+    "discount_price": 32,
+    "discount_percentage": 9,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2004",
+    "product_title": "Curd 500g",
+    "product_image": "https://www.vegrecipesofindia.com/wp-content/uploads/2012/05/how-to-make-curd-recipe-1.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 45,
+    "discount_price": 40,
+    "discount_percentage": 11,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2005",
+    "product_title": "ButterMilk 500ml",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/c/ce/Buttermilk.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 25,
+    "discount_price": 22,
+    "discount_percentage": 12,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2006",
+    "product_title": "Paneer 200g",
+    "product_image": "https://5.imimg.com/data5/ANDROID/Default/2023/3/EH/YT/EO/108385388/product-jpeg-500x500.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 90,
+    "discount_price": 80,
+    "discount_percentage": 11,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2007",
+    "product_title": "Butter 100g",
+    "product_image": "https://cdn.britannica.com/27/122027-050-EAA86783/Butter.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 58,
+    "discount_price": 52,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2008",
+    "product_title": "Cheese Slices 200g",
+    "product_image": "https://5.imimg.com/data5/SELLER/Default/2024/11/467060274/TD/IK/XV/8960632/cheese-slice-765g-50-slices.png",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 130,
+    "discount_price": 115,
+    "discount_percentage": 12,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2009",
+    "product_title": "Cheese cubes 200g",
+    "product_image": "https://www.starquik.com/cdn/shop/files/SQ101686_5_25022e6d-2964-4db2-a007-0c2368f2c1ab.jpg?v=1776845422&width=416",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 125,
+    "discount_price": 110,
+    "discount_percentage": 12,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2010",
+    "product_title": "Ghee 200ml",
+    "product_image": "https://www.cookwithkushi.com/wp-content/uploads/2022/10/best_homemade_traditional_desi_ghee.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 150,
+    "discount_price": 135,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2011",
+    "product_title": "White Bread",
+    "product_image": "https://www.allrecipes.com/thmb/3Bhpg3W6sjCn0VTQ_yXLUyHr-3k=/0x512/filters:no_upscale():max_bytes(150000):strip_icc()/6788-amish-white-bread-DDMFS-4x3-6faa1e552bdb4f6eabdd7791e59b3c84.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 40,
+    "discount_price": 35,
+    "discount_percentage": 13,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2012",
+    "product_title": "Brown Bread",
+    "product_image": "https://sallysbakingaddiction.com/wp-content/uploads/2024/01/whole-wheat-sandwich-bread-2.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 50,
+    "discount_price": 45,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2013",
+    "product_title": "Whole Wheat Bread",
+    "product_image": "https://www.allrecipes.com/thmb/_Mgp9ObZqGUJAnsdsvoCHq_yoUc=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/272420-easy-100-whole-wheat-bread-VAT-Beauty-4x3-d2b2488a1ce04a4eaac67658cfc99e45.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 55,
+    "discount_price": 49,
+    "discount_percentage": 11,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2014",
+    "product_title": "Pav(6 pcs)",
+    "product_image": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRVxtfQFwh-y2M56K8bZSMhIA9BOrmb7mRxcEnrDQMhAjkyZaQKpk5w5Wu6&s=10",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 30,
+    "discount_price": 27,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2015",
+    "product_title": "Buns",
+    "product_image": "https://www.thereciperebel.com/wp-content/uploads/2020/04/moms-homemade-buns-www.thereciperebel.com-600-12-of-22.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 35,
+    "discount_price": 30,
+    "discount_percentage": 14,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2016",
+    "product_title": "Eggs(6pcs)",
+    "product_image": "https://images-prod.healthline.com/hlcmsresource/images/AN_images/health-benefits-of-eggs-1296x728-feature.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 48,
+    "discount_price": 43,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2017",
+    "product_title": "Oats 500g",
+    "product_image": "https://chandanbrothers.com/wp-content/uploads/2024/05/Rolled-oats-min.jpeg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 120,
+    "discount_price": 105,
+    "discount_percentage": 13,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2018",
+    "product_title": "Cornflakes 250g",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/c/c0/Cornflakes.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 95,
+    "discount_price": 85,
+    "discount_percentage": 11,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2019",
+    "product_title": "Muesli 500g",
+    "product_image": "https://tastesbetterfromscratch.com/wp-content/uploads/2025/01/Muesli25-1.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 220,
+    "discount_price": 199,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2020",
+    "product_title": "Chocos 250g",
+    "product_image": "https://www.omnisun.in/wp-content/uploads/2021/09/Choco-Flakes.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 110,
+    "discount_price": 99,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2021",
+    "product_title": "Peanut Butter 340g",
+    "product_image": "https://www.occasionallyeggs.com/wp-content/uploads/2022/09/Homemade-Peanut-Butter.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 180,
+    "discount_price": 160,
+    "discount_percentage": 11,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2022",
+    "product_title": "Jam 200g",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/b/b1/Mix_Fruit_Jam.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 85,
+    "discount_price": 75,
+    "discount_percentage": 12,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2023",
+    "product_title": "Honey 250g",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/2/24/Organic_Honey.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 160,
+    "discount_price": 144,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2024",
+    "product_title": "Tea Powder 250g",
+    "product_image": "https://www.greendna.in/cdn/shop/products/assam-ctc-tea-500x500_500x.jpg?v=1591199209",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 120,
+    "discount_price": 108,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2025",
+    "product_title": "Coffee Powder 100g",
+    "product_image": "https://hindustanspices.in/storage/products/IId7cywyKVHOK9ln3nIWn01yDLgtjTfUGHZaF5V2.png",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 95,
+    "discount_price": 85,
+    "discount_percentage": 11,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2026",
+    "product_title": "Green Tea (25 bags)",
+    "product_image": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Teabag_with_green_tag.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 150,
+    "discount_price": 135,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2027",
+    "product_title": "Sugar 1kg",
+    "product_image": "https://www.tasteofhome.com/wp-content/uploads/2019/11/sugar-shutterstock_615908132.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 50,
+    "discount_price": 45,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2028",
+    "product_title": "Jaggery 500g",
+    "product_image": "https://www.health.com/thmb/sjw6tl9BsMoU490NoiI_Wk7ljYc=/2121x0/filters:no_upscale():max_bytes(150000):strip_icc()/Health-GettyImages-2185398044-78d583abd4cc492aaef1c55a3a403a5f.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 60,
+    "discount_price": 54,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2029",
+    "product_title": "Idli Batter 1kg",
+    "product_image": "https://spicecravings.com/wp-content/uploads/2020/06/Idli-Dosa-Batter-2.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 60,
+    "discount_price": 54,
+    "discount_percentage": 10,
+    "is_add_to_cart": true
+  },
+  {
+    "product_id": "lp-2030",
+    "product_title": "Dosa Batter 1kg",
+    "product_image": "https://sandhyahariharan.co.uk/wp-content/uploads/2020/07/idli-dosa-batter-5-of-13.jpg",
+    "category_id": "c4000000-0000-4000-8000-000000000203",
+    "mrp": 65,
+    "discount_price": 58,
+    "discount_percentage": 11,
     "is_add_to_cart": true
   }
 ];

@@ -190,6 +190,12 @@ export function formatCleanWidget(raw: any): CleanDashboardWidget {
 
 /**
  * Formats the final Customer Dashboard API response envelope per Section 4.
+ * Automatic pagination for ANY widget:
+ * - For every widget whose items count is MORE than limit: return only items slice ((page-1)*limit, page*limit)
+ *   and add "pagination": { page, limit, total_items, total_pages, returned, has_next, has_prev }.
+ * - Widgets with items count <= limit: returned in full, NO pagination field.
+ * - Page beyond the last page for a long widget: items [], returned 0, has_next false, has_prev true.
+ * - Applies to HAATZA and LITE, any widget_name, no names hard-coded.
  */
 export function formatDashboardResponse(
   module: string,
@@ -197,11 +203,43 @@ export function formatDashboardResponse(
   territory: string,
   rawWidgets: any[],
   warehouseId?: string,
+  page?: number,
+  limit?: number,
 ): CustomerDashboardResponse {
   const cleanWidgets: CleanDashboardWidget[] = rawWidgets.map(formatCleanWidget);
 
   // Strictly sort by sequence ascending, with deterministic tie-breaker on widget_id ascending
   cleanWidgets.sort((a, b) => a.sequence - b.sequence || a.widget_id.localeCompare(b.widget_id));
+
+  // "No params" branch: If neither page nor limit is sent, return all items in full with no pagination field (opt-in)
+  if (page !== undefined || limit !== undefined) {
+    const effectivePage = page && page >= 1 ? page : 1;
+    const effectiveLimit = limit && limit >= 1 ? limit : 20;
+    const start = (effectivePage - 1) * effectiveLimit;
+    const end = start + effectiveLimit;
+
+    for (const widget of cleanWidgets) {
+      const totalItems = widget.items.length;
+      if (totalItems > effectiveLimit) {
+        const totalPages = Math.ceil(totalItems / effectiveLimit);
+        const slicedItems = widget.items.slice(start, end);
+        const returned = slicedItems.length;
+        const hasNext = effectivePage < totalPages;
+        const hasPrev = effectivePage > 1;
+
+        widget.items = slicedItems;
+        widget.pagination = {
+          page: effectivePage,
+          limit: effectiveLimit,
+          total_items: totalItems,
+          total_pages: totalPages,
+          returned,
+          has_next: hasNext,
+          has_prev: hasPrev,
+        };
+      }
+    }
+  }
 
   const response: CustomerDashboardResponse = {
     success: true,

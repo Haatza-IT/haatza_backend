@@ -32,6 +32,16 @@ export interface ProductItem {
   is_add_to_cart: boolean;
 }
 
+export interface WidgetPagination {
+  page: number;
+  limit: number;
+  total_items: number;
+  total_pages: number;
+  returned: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
 export interface CleanDashboardWidget {
   widget_id: string;
   widget_name: string;
@@ -40,6 +50,7 @@ export interface CleanDashboardWidget {
   redirect_category_id: string;
   redirect_product_id: string;
   items: any[];
+  pagination?: WidgetPagination;
 }
 
 export interface CustomerDashboardResponse {
@@ -59,6 +70,8 @@ export interface DashboardQueryDto {
   placement: AllowedPlacement;
   warehouseId?: string;
   raw?: boolean;
+  page?: number;
+  limit?: number;
 }
 
 export type CustomerDashboardQueryDto = DashboardQueryDto;
