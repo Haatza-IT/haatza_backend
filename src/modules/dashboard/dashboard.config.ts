@@ -5,15 +5,107 @@
  * which are independent from the IDs in the legacy Category table.
  */
 
-export const PLACEHOLDER_MENS_FASHION_ID = 'PLACEHOLDER_MENS_FASHION_ID';
-export const PLACEHOLDER_WOMENS_FASHION_ID = 'PLACEHOLDER_WOMENS_FASHION_ID';
-export const PLACEHOLDER_KIDS_FASHION_ID = 'PLACEHOLDER_KIDS_FASHION_ID';
+
+// Men's Fashion Sub-Category Literal Placeholders
+export const PLACEHOLDER_MENS_TSHIRTS_POLOS_ID    = 'PLACEHOLDER_MENS_TSHIRTS_POLOS_ID';
+export const PLACEHOLDER_MENS_CASUAL_SHIRTS_ID    = 'PLACEHOLDER_MENS_CASUAL_SHIRTS_ID';
+export const PLACEHOLDER_MENS_JEANS_TROUSERS_ID   = 'PLACEHOLDER_MENS_JEANS_TROUSERS_ID';
+export const PLACEHOLDER_MENS_ETHNIC_KURTAS_ID    = 'PLACEHOLDER_MENS_ETHNIC_KURTAS_ID';
+export const PLACEHOLDER_MENS_JACKETS_HOODIES_ID   = 'PLACEHOLDER_MENS_JACKETS_HOODIES_ID';
+export const PLACEHOLDER_MENS_FOOTWEAR_SNEAKERS_ID = 'PLACEHOLDER_MENS_FOOTWEAR_SNEAKERS_ID';
+export const PLACEHOLDER_MENS_WATCHES_ACCESSORIES_ID = 'PLACEHOLDER_MENS_WATCHES_ACCESSORIES_ID';
+
+// Women's Fashion Sub-Category Literal Placeholders
+export const PLACEHOLDER_WOMENS_KURTIS_SUITS_ID     = 'PLACEHOLDER_WOMENS_KURTIS_SUITS_ID';
+export const PLACEHOLDER_WOMENS_SAREES_ID           = 'PLACEHOLDER_WOMENS_SAREES_ID';
+export const PLACEHOLDER_WOMENS_WESTERN_TOPS_TEES_ID = 'PLACEHOLDER_WOMENS_WESTERN_TOPS_TEES_ID';
+export const PLACEHOLDER_WOMENS_DRESSES_JUMPSUITS_ID = 'PLACEHOLDER_WOMENS_DRESSES_JUMPSUITS_ID';
+export const PLACEHOLDER_WOMENS_JEANS_TROUSERS_ID   = 'PLACEHOLDER_WOMENS_JEANS_TROUSERS_ID';
+export const PLACEHOLDER_WOMENS_HEELS_FOOTWEAR_ID   = 'PLACEHOLDER_WOMENS_HEELS_FOOTWEAR_ID';
+export const PLACEHOLDER_WOMENS_JEWELRY_WATCHES_ID  = 'PLACEHOLDER_WOMENS_JEWELRY_WATCHES_ID';
+
+export const ALL_CATEGORY_ID                 = 'c4000000-0000-4000-8000-000000000101';
+export const MENS_FASHION_CATEGORY_ID        = 'c4000000-0000-4000-8000-000000000102';
+export const WOMENS_FASHION_CATEGORY_ID      = 'c4000000-0000-4000-8000-000000000103';
+export const ELECTRONICS_CATEGORY_ID         = 'c4000000-0000-4000-8000-000000000104';
+export const HOME_AND_LIVING_CATEGORY_ID     = 'c4000000-0000-4000-8000-000000000105';
+export const BEAUTY_CATEGORY_ID              = 'c4000000-0000-4000-8000-000000000106';
+export const APPLIANCES_CATEGORY_ID          = 'c4000000-0000-4000-8000-000000000107';
+export const TOYS_AND_GAMES_CATEGORY_ID      = 'c4000000-0000-4000-8000-000000000108';
+export const SPORTS_AND_FITNESS_CATEGORY_ID  = 'c4000000-0000-4000-8000-000000000109';
+export const BOOKS_CATEGORY_ID               = 'c4000000-0000-4000-8000-000000000110';
+export const FURNITURE_CATEGORY_ID           = 'c4000000-0000-4000-8000-000000000111';
+export const GROCERIES_CATEGORY_ID           = 'c4000000-0000-4000-8000-000000000112';
+export const AUTOMOTIVE_CATEGORY_ID          = 'c4000000-0000-4000-8000-000000000113';
+export const MOBILES_CATEGORY_ID             = 'c4000000-0000-4000-8000-000000000114';
+export const BABY_CARE_CATEGORY_ID           = 'c4000000-0000-4000-8000-000000000115';
+export const PET_SUPPLIES_CATEGORY_ID        = 'c4000000-0000-4000-8000-000000000116';
+export const JEWELRY_CATEGORY_ID             = 'c4000000-0000-4000-8000-000000000117';
+export const GIFT_CARD_CATEGORY_ID           = 'c4000000-0000-4000-8000-000000000118';
+
+// LITE Categories (12 Categories: 201 through 212)
+export const LITE_ALL_CATEGORY_ID                 = 'c4000000-0000-4000-8000-000000000201';
+export const LITE_FRUITS_VEGETABLES_CATEGORY_ID   = 'c4000000-0000-4000-8000-000000000202';
+export const LITE_DAILY_BREAKFAST_CATEGORY_ID     = 'c4000000-0000-4000-8000-000000000203';
+export const LITE_SNACKS_BEVERAGES_CATEGORY_ID    = 'c4000000-0000-4000-8000-000000000204';
+export const LITE_HOUSEHOLD_CLEANING_CATEGORY_ID  = 'c4000000-0000-4000-8000-000000000205';
+export const LITE_PERSONAL_CARE_CATEGORY_ID       = 'c4000000-0000-4000-8000-000000000206';
+export const LITE_KITCHEN_ESSENTIALS_CATEGORY_ID  = 'c4000000-0000-4000-8000-000000000207';
+export const LITE_BAKERY_BREADS_CATEGORY_ID       = 'c4000000-0000-4000-8000-000000000208';
+export const LITE_STAPLES_COOKING_CATEGORY_ID     = 'c4000000-0000-4000-8000-000000000209';
+export const LITE_FROZEN_FOODS_CATEGORY_ID        = 'c4000000-0000-4000-8000-000000000210';
+export const LITE_BABY_CARE_CATEGORY_ID           = 'c4000000-0000-4000-8000-000000000211';
+export const LITE_PET_SUPPLIES_CATEGORY_ID        = 'c4000000-0000-4000-8000-000000000212';
+
+// Category aliases
+export const LITE_FRUITS_AND_VEGETABLES_CATEGORY_ID = LITE_FRUITS_VEGETABLES_CATEGORY_ID;
+export const LITE_DAILY_AND_BREAKFAST_CATEGORY_ID   = LITE_DAILY_BREAKFAST_CATEGORY_ID;
+export const LITE_SNACKS_AND_BEVERAGES_CATEGORY_ID  = LITE_SNACKS_BEVERAGES_CATEGORY_ID;
+export const LITE_BAKERY_AND_BREADS_CATEGORY_ID     = LITE_BAKERY_BREADS_CATEGORY_ID;
+export const LITE_STAPLES_AND_COOKING_CATEGORY_ID   = LITE_STAPLES_COOKING_CATEGORY_ID;
+
+/**
+ * 28 Supported Indian State Codes
+ */
+export const INDIAN_STATE_CODES = [
+  'AP', 'AR', 'AS', 'BR', 'CG', 'GA', 'GJ', 'HR',
+  'HP', 'JH', 'KA', 'KL', 'MP', 'MH', 'MN', 'ML',
+  'MZ', 'NL', 'OD', 'PB', 'RJ', 'SK', 'TN', 'TS',
+  'TR', 'UP', 'UK', 'WB',
+] as const;
+
+export type IndianStateCode = (typeof INDIAN_STATE_CODES)[number];
+
+export function isIndianStateCode(val: unknown): val is IndianStateCode {
+  return typeof val === 'string' && (INDIAN_STATE_CODES as readonly string[]).includes(val);
+}
+
+/**
+ * LITE Warehouse Identifiers
+ */
+export const LITE_WAREHOUSES = [
+  'WAREHOUSE001',
+  'WAREHOUSE002',
+  'WAREHOUSE003',
+  'WAREHOUSE004',
+  'WAREHOUSE005',
+] as const;
+
+export type LiteWarehouseId = (typeof LITE_WAREHOUSES)[number];
+
+export function isLiteWarehouseId(val: unknown): val is LiteWarehouseId {
+  return typeof val === 'string' && (LITE_WAREHOUSES as readonly string[]).includes(val);
+}
 
 /**
  * Shared layout placement constants across customer APIs, validation, caching, and admin management.
  */
 export const ALLOWED_PLACEMENTS = ['DESKTOP', 'MOBILE'] as const;
 export type AllowedPlacement = (typeof ALLOWED_PLACEMENTS)[number];
+
+export function isAllowedPlacement(val: unknown): val is AllowedPlacement {
+  return typeof val === 'string' && (ALLOWED_PLACEMENTS as readonly string[]).includes(val);
+}
 
 export interface CategoryDefinition {
   no: number;
@@ -22,27 +114,40 @@ export interface CategoryDefinition {
 }
 
 export const HAATZA_CATEGORIES: CategoryDefinition[] = [
-  { no: 1, name: 'All', categoryId: 'c4000000-0000-4000-8000-000000000101' },
-  { no: 2, name: 'Electronics', categoryId: 'c4000000-0000-4000-8000-000000000102' },
-  { no: 3, name: 'Home and Living', categoryId: 'c4000000-0000-4000-8000-000000000103' },
-  { no: 4, name: 'Beauty', categoryId: 'c4000000-0000-4000-8000-000000000104' },
-  { no: 5, name: 'Appliances', categoryId: 'c4000000-0000-4000-8000-000000000105' },
-  { no: 6, name: 'Toys and Games', categoryId: 'c4000000-0000-4000-8000-000000000106' },
-  { no: 7, name: 'Sports and Fitness', categoryId: 'c4000000-0000-4000-8000-000000000107' },
-  { no: 8, name: 'Books', categoryId: 'c4000000-0000-4000-8000-000000000108' },
-  { no: 9, name: 'Furniture', categoryId: 'c4000000-0000-4000-8000-000000000109' },
-  { no: 10, name: 'Groceries', categoryId: 'c4000000-0000-4000-8000-000000000110' },
-  { no: 11, name: 'Automotive', categoryId: 'c4000000-0000-4000-8000-000000000111' },
-  { no: 12, name: 'Mobiles', categoryId: 'c4000000-0000-4000-8000-000000000112' },
-  { no: 13, name: 'Baby Care', categoryId: 'c4000000-0000-4000-8000-000000000113' },
-  { no: 14, name: 'Pet Supplies', categoryId: 'c4000000-0000-4000-8000-000000000114' },
-  { no: 15, name: 'Jewelry', categoryId: 'c4000000-0000-4000-8000-000000000115' },
-  { no: 16, name: 'Gift Card', categoryId: 'c4000000-0000-4000-8000-000000000116' },
-  { no: 17, name: '(reserved, name to be confirmed)', categoryId: 'c4000000-0000-4000-8000-000000000117' },
-  { no: 18, name: '(reserved, name to be confirmed)', categoryId: 'c4000000-0000-4000-8000-000000000118' },
+  { no: 1, name: 'All', categoryId: ALL_CATEGORY_ID },
+  { no: 2, name: "Men's Fashion", categoryId: MENS_FASHION_CATEGORY_ID },
+  { no: 3, name: "Women's Fashion", categoryId: WOMENS_FASHION_CATEGORY_ID },
+  { no: 4, name: 'Electronics', categoryId: ELECTRONICS_CATEGORY_ID },
+  { no: 5, name: 'Home and Living', categoryId: HOME_AND_LIVING_CATEGORY_ID },
+  { no: 6, name: 'Beauty', categoryId: BEAUTY_CATEGORY_ID },
+  { no: 7, name: 'Appliances', categoryId: APPLIANCES_CATEGORY_ID },
+  { no: 8, name: 'Toys and Games', categoryId: TOYS_AND_GAMES_CATEGORY_ID },
+  { no: 9, name: 'Sports and Fitness', categoryId: SPORTS_AND_FITNESS_CATEGORY_ID },
+  { no: 10, name: 'Books', categoryId: BOOKS_CATEGORY_ID },
+  { no: 11, name: 'Furniture', categoryId: FURNITURE_CATEGORY_ID },
+  { no: 12, name: 'Groceries', categoryId: GROCERIES_CATEGORY_ID },
+  { no: 13, name: 'Automotive', categoryId: AUTOMOTIVE_CATEGORY_ID },
+  { no: 14, name: 'Mobiles', categoryId: MOBILES_CATEGORY_ID },
+  { no: 15, name: 'Baby Care', categoryId: BABY_CARE_CATEGORY_ID },
+  { no: 16, name: 'Pet Supplies', categoryId: PET_SUPPLIES_CATEGORY_ID },
+  { no: 17, name: 'Jewelry', categoryId: JEWELRY_CATEGORY_ID },
+  { no: 18, name: 'Gift Card', categoryId: GIFT_CARD_CATEGORY_ID },
 ];
 
-export const ALL_CATEGORY_ID = 'c4000000-0000-4000-8000-000000000101';
+export const LITE_CATEGORIES: CategoryDefinition[] = [
+  { no: 1, name: 'All', categoryId: LITE_ALL_CATEGORY_ID },
+  { no: 2, name: 'Fruits and Vegetables', categoryId: LITE_FRUITS_VEGETABLES_CATEGORY_ID },
+  { no: 3, name: 'Daily and Breakfast', categoryId: LITE_DAILY_BREAKFAST_CATEGORY_ID },
+  { no: 4, name: 'Snacks and Beverages', categoryId: LITE_SNACKS_BEVERAGES_CATEGORY_ID },
+  { no: 5, name: 'Household Cleaning', categoryId: LITE_HOUSEHOLD_CLEANING_CATEGORY_ID },
+  { no: 6, name: 'Personal Care', categoryId: LITE_PERSONAL_CARE_CATEGORY_ID },
+  { no: 7, name: 'Kitchen Essentials', categoryId: LITE_KITCHEN_ESSENTIALS_CATEGORY_ID },
+  { no: 8, name: 'Bakery and Breads', categoryId: LITE_BAKERY_BREADS_CATEGORY_ID },
+  { no: 9, name: 'Staples and Cooking', categoryId: LITE_STAPLES_COOKING_CATEGORY_ID },
+  { no: 10, name: 'Frozen Foods', categoryId: LITE_FROZEN_FOODS_CATEGORY_ID },
+  { no: 11, name: 'Baby Care', categoryId: LITE_BABY_CARE_CATEGORY_ID },
+  { no: 12, name: 'Pet Supplies', categoryId: LITE_PET_SUPPLIES_CATEGORY_ID },
+];
 
 export type WidgetItemType = 'BANNER' | 'CATEGORY_TILE' | 'PRODUCT';
 
@@ -99,6 +204,14 @@ export const WIDGET_NAME_TO_TYPE: Record<string, WidgetItemType> = {
   'Bestseller Favorites': 'PRODUCT',
   'Fresh New Arrivals': 'PRODUCT',
   'More to Explore': 'PRODUCT',
+  // LITE Widget Names
+  'Everyday Essentials': 'PRODUCT',
+  'Live Automated Dispatch Belt': 'BANNER',
+  'Promo Banner': 'BANNER',
+  'Offer Banner': 'BANNER',
+  'Fresh Fruits and Daily Greens': 'PRODUCT',
+  'Household Cleaning and Hygiene': 'PRODUCT',
+  'Category Products': 'PRODUCT',
 };
 
 /**

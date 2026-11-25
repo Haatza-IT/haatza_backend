@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { ALLOWED_PLACEMENTS, type AllowedPlacement } from './dashboard.config';
+import {
+  ALLOWED_PLACEMENTS,
+  isAllowedPlacement,
+  type AllowedPlacement,
+  INDIAN_STATE_CODES,
+  isIndianStateCode,
+  type IndianStateCode,
+  LITE_WAREHOUSES,
+  isLiteWarehouseId,
+} from './dashboard.config';
 
 /**
  * Items validator: accepts a JSON array (PostgreSQL JSONB), or a JSON string parsed into an array.
@@ -121,7 +130,7 @@ export const createDashboardSchema = z
       widget_id: finalWidgetId ? finalWidgetId.trim() : '',
       widget_name: finalWidgetName ? finalWidgetName.trim() : '',
       widget_redirect_to: (data.widget_redirect_to ?? data.Redirected_to)?.trim() || '',
-      placement: (data.placement ?? data.Placement)?.trim() || 'DESKTOP',
+      placement: (data.placement ?? data.Placement)?.trim() || ALLOWED_PLACEMENTS[0],
       sequence:
         data.sequence !== undefined && data.sequence !== null
           ? Number(data.sequence)
@@ -214,7 +223,7 @@ export type UpdateDashboardInput = z.infer<typeof updateDashboardSchema>;
  */
 export const customerDashboardQuerySchema = z
   .object({
-    module: z.string().trim().min(1, "module is required. Allowed values: 'HAATZA', 'LITE'"),
+    module: z.string().trim().optional(),
     categoryId: z.string().trim().optional(),
     category_id: z.string().trim().optional(),
     territory: z.string().trim().optional(),
@@ -227,24 +236,45 @@ export const customerDashboardQuerySchema = z
         z.string().transform((v) => v.toLowerCase() === 'true' || v === '1'),
       ])
       .optional(),
+    limit: z.coerce.number().optional(),
+    skip: z.coerce.number().optional(),
+    page: z.coerce.number().optional(),
+    sequence: z.coerce.number().optional(),
+    status: z
+      .union([
+        z.boolean(),
+        z.string().transform((v) => v.toLowerCase() === 'true' || v === '1'),
+      ])
+      .optional(),
   })
   .superRefine((data, ctx) => {
-    // 1. module check
-    const mod = data.module.toUpperCase();
+    // If raw=true is set, this is an admin/CMS request, skip customer strict requirements
+    if (data.raw) {
+      return;
+    }
+
+    // 1. module check (mandatory for customer requests)
+    const rawMod = (data.module || '').trim();
+    if (!rawMod) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['module'],
+        message: "module is required. Allowed values: 'HAATZA', 'LITE'",
+      });
+      return;
+    }
+
+    const mod = rawMod.toUpperCase();
     if (mod !== 'HAATZA' && mod !== 'LITE') {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['module'],
         message: `module must be either 'HAATZA' or 'LITE'. Received: '${data.module}'`,
       });
-    }
-
-    // If raw=true is set, this is an admin/CMS request, skip customer strict requirements
-    if (data.raw) {
       return;
     }
 
-    // 2. placement check (mandatory: strictly DESKTOP or MOBILE)
+    // 2. placement check (mandatory for BOTH HAATZA and LITE)
     const rawPlc = data.placement;
     const plc = (rawPlc || '').trim();
     if (!plc) {
@@ -253,7 +283,7 @@ export const customerDashboardQuerySchema = z
         path: ['placement'],
         message: `placement is required. Allowed values: ${ALLOWED_PLACEMENTS.map((p) => `'${p}'`).join(', ')}`,
       });
-    } else if (!ALLOWED_PLACEMENTS.includes(plc as any)) {
+    } else if (!isAllowedPlacement(plc)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['placement'],
@@ -271,20 +301,23 @@ export const customerDashboardQuerySchema = z
       });
     }
 
-    // 4. territory check (must be present and exactly 2 digits)
-    const terr = (data.territory || '').trim();
-    if (!terr) {
+    // 4. territory check (must be one of the 28 Indian state codes)
+    const rawTerr = data.territory;
+    if (!rawTerr || rawTerr.trim().length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['territory'],
-        message: 'territory is required and must be exactly 2 digits',
+        message: 'territory is required. Must be one of the 28 supported Indian state codes.',
       });
-    } else if (!/^\d{2}$/.test(terr)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['territory'],
-        message: `territory must be exactly 2 digits. Received: '${terr}'`,
-      });
+    } else {
+      const terr = rawTerr.trim();
+      if (rawTerr !== terr || !isIndianStateCode(terr)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['territory'],
+          message: `territory must be a valid 2-letter uppercase Indian state code. Received: '${rawTerr}'`,
+        });
+      }
     }
 
     // 5. warehouseId check for LITE
@@ -296,16 +329,27 @@ export const customerDashboardQuerySchema = z
           path: ['warehouseId'],
           message: 'warehouseId is required for LITE module',
         });
+      } else if (!isLiteWarehouseId(whId)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['warehouseId'],
+          message: `warehouseId must be one of: ${LITE_WAREHOUSES.join(', ')}. Received: '${whId}'`,
+        });
       }
     }
   })
   .transform((data) => ({
-    module: data.module.toUpperCase() as 'HAATZA' | 'LITE',
+    module: (data.module || '').toUpperCase() as 'HAATZA' | 'LITE',
     categoryId: (data.categoryId || data.category_id || '').trim(),
     territory: (data.territory || '').trim(),
     placement: (data.placement || '').trim() as AllowedPlacement,
     warehouseId: (data.warehouseId || data.warehouse_id || '').trim(),
     raw: Boolean(data.raw),
+    limit: data.limit,
+    skip: data.skip,
+    page: data.page,
+    sequence: data.sequence,
+    status: data.status,
   }));
 
 export type CustomerDashboardQueryInput = z.infer<typeof customerDashboardQuerySchema>;

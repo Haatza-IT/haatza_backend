@@ -8,12 +8,17 @@ import {
   Body,
   Param,
   Query,
+  Req,
   HttpCode,
   HttpStatus,
   UsePipes,
   UseGuards,
   Inject,
+  UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
+import type { Request } from 'express';
+import * as crypto from 'crypto';
 import { DashboardService } from './dashboard.service';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
@@ -40,8 +45,8 @@ export class DashboardController {
 
   /**
    * Primary Customer Dashboard endpoint.
-   * If `raw=true` is sent by CMS/admin, returns raw widget records.
-   * Otherwise returns the unified Customer Dashboard response.
+   * If `raw=true` is sent by CMS/admin, requires admin authentication and returns raw widget records.
+   * Otherwise returns the unified Customer Dashboard response (public access).
    *
    * Example:
    * GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&territory=56&placement=DESKTOP
@@ -49,8 +54,10 @@ export class DashboardController {
   @Get()
   async getDashboard(
     @Query(new ZodValidationPipe(customerDashboardQuerySchema)) query: CustomerDashboardQueryInput,
+    @Req() req: Request,
   ): Promise<CustomerDashboardResponse | DashboardListResponse> {
     if (query.raw) {
+      this.validateAdminAccess(req);
       return this.dashboardService.findAllWidgets(query);
     }
     return this.dashboardService.getCustomerDashboard(query);
@@ -117,9 +124,59 @@ export class DashboardController {
   }
 
   /**
+   * Validates admin authentication for raw listing requests.
+   */
+  private validateAdminAccess(req: Request): void {
+    const adminKeyHeader = req.headers['x-admin-key'];
+    const authHeader = req.headers['authorization'];
+
+    let suppliedKey: string | null = null;
+    if (adminKeyHeader) {
+      suppliedKey = Array.isArray(adminKeyHeader)
+        ? adminKeyHeader[0].trim()
+        : String(adminKeyHeader).trim();
+    } else if (authHeader) {
+      const authStr = Array.isArray(authHeader) ? authHeader[0].trim() : String(authHeader).trim();
+      if (authStr.startsWith('Bearer ')) {
+        suppliedKey = authStr.substring(7).trim();
+      } else {
+        suppliedKey = authStr;
+      }
+    }
+
+    if (!suppliedKey || suppliedKey.length === 0) {
+      throw new UnauthorizedException({
+        success: false,
+        message: 'Authentication required: Admin API key is missing. Provide x-admin-key or Authorization Bearer header.',
+        errors: [],
+      });
+    }
+
+    const expectedSecret = process.env.ADMIN_API_KEY;
+    if (!expectedSecret || expectedSecret.trim().length === 0) {
+      throw new UnauthorizedException({
+        success: false,
+        message: 'Authentication failed: Server administrator authentication is not configured.',
+        errors: [],
+      });
+    }
+
+    const hashA = crypto.createHash('sha256').update(suppliedKey).digest();
+    const hashB = crypto.createHash('sha256').update(expectedSecret.trim()).digest();
+    if (!crypto.timingSafeEqual(hashA, hashB)) {
+      throw new ForbiddenException({
+        success: false,
+        message: 'Forbidden: Insufficient permissions',
+        errors: [],
+      });
+    }
+  }
+
+  /**
    * Retrieves a single dashboard widget by widget_id.
    * Method: GET /api/dashboard/:id
    */
+  @UseGuards(AdminAuthGuard)
   @Get(':id')
   async findWidgetById(
     @Param('id') id: string,

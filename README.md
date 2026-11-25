@@ -51,7 +51,7 @@ The project is structured according to **Clean Layered Architecture**:
    ```
    Configure your database URL and admin key:
    ```env
-   DATABASE_URL="postgresql://postgres:password@localhost:5432/haatza_backend?schema=public"
+   DATABASE_URL="postgresql://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:5432/<DB_NAME>?schema=public"
    ADMIN_API_KEY="YOUR_ADMIN_KEY"
    ```
 
@@ -108,6 +108,7 @@ Deep dive into any component using our comprehensive technical guides:
 - [**Project Structure & Component Map**](docs/PROJECT_STRUCTURE.md): File matrix and high-level architectural diagram.
 - [**Database Documentation**](docs/DATABASE_DOCUMENTATION.md): Complete field-by-field reference of `user_masters`.
 - [**API Documentation**](docs/API_DOCUMENTATION.md): Endpoint payloads, response envelopes, and error scenarios.
+- [**Haatza Dashboard API Reference**](docs/HAATZA_DASHBOARD_API.md): Multi-category layout and widget contracts for HAATZA and LITE modules.
 - [**Validation Architecture**](docs/VALIDATION_DOCUMENTATION.md): Zod schemas and the Mod-36 GSTIN checksum algorithm.
 - [**Security Documentation**](docs/SECURITY_DOCUMENTATION.md): Bcrypt hashing, admin guards, and data masking.
 - [**Migration History**](docs/MIGRATION_HISTORY.md): Database migration logs and verification results.

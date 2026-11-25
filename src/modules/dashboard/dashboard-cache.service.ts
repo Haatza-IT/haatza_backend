@@ -34,7 +34,7 @@ export class DashboardCacheService {
     warehouseId?: string,
   ): string {
     const mod = module.toUpperCase().trim();
-    const plc = placement.toUpperCase().trim();
+    const plc = (placement || '').toUpperCase().trim();
     const cat = categoryId.trim();
     const ter = territory.trim();
     if (mod === 'LITE') {
@@ -45,7 +45,8 @@ export class DashboardCacheService {
   }
 
   /**
-   * Retrieves data from the cache if not expired
+   * Retrieves data from the cache if not expired.
+   * Refreshes entry position in LRU order upon access.
    */
   public get<T>(key: string): T | null {
     const entry = this.cache.get(key);
@@ -56,18 +57,24 @@ export class DashboardCacheService {
       this.cache.delete(key);
       return null;
     }
+    // Refresh LRU order: delete and re-insert moves to the end (most recently used)
+    this.cache.delete(key);
+    this.cache.set(key, entry);
     return entry.data as T;
   }
 
   /**
-   * Stores data in the cache with the configured TTL
+   * Stores data in the cache with the configured TTL.
+   * Evicts the least recently used (first) entry when capacity is reached.
    */
   public set<T>(key: string, data: T, customTtlMs?: number): void {
-    if (this.cache.size >= this.maxEntries) {
-      // FIFO eviction of the oldest entry
-      const oldestKey = this.cache.keys().next().value;
-      if (oldestKey) {
-        this.cache.delete(oldestKey);
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxEntries) {
+      // Evict least recently used (first in iteration order)
+      const lruKey = this.cache.keys().next().value;
+      if (lruKey !== undefined) {
+        this.cache.delete(lruKey);
       }
     }
     const expiresAt = Date.now() + (customTtlMs ?? this.ttlMs);
@@ -120,7 +127,7 @@ export class DashboardCacheService {
   public invalidateCategory(module: string, categoryId: string): void {
     const mod = module.toUpperCase().trim();
     const cat = categoryId.trim();
-    for (const key of this.cache.keys()) {
+    for (const key of Array.from(this.cache.keys())) {
       for (const plc of ALLOWED_PLACEMENTS) {
         if (key.startsWith(`dashboard:${mod}:${plc}:${cat}:`)) {
           this.cache.delete(key);

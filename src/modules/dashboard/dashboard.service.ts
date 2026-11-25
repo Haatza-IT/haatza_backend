@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { DashboardCacheService } from './dashboard-cache.service';
 import { formatDashboardResponse } from './dashboard-formatter.util';
+import { ALLOWED_PLACEMENTS, isAllowedPlacement, isIndianStateCode } from './dashboard.config';
 import { sanitizeNulls } from '../../common/utils/null-sanitizer.util';
 import type {
   CreateDashboardDto,
@@ -48,7 +49,7 @@ export class DashboardService {
       widget_id: String(record.widgetId ?? record.widget_id ?? ''),
       widget_name: String(record.widgetName ?? record.widget_name ?? ''),
       widget_redirect_to: String(record.widgetRedirectTo ?? record.widget_redirect_to ?? ''),
-      placement: String(record.placement ?? 'DESKTOP'),
+      placement: String(record.placement ?? ALLOWED_PLACEMENTS[0]),
       sequence: record.sequence !== null && record.sequence !== undefined ? Number(record.sequence) : 0,
       territory: String(record.territory ?? '56'),
       items: sanitizedItems,
@@ -93,12 +94,14 @@ export class DashboardService {
     }
 
     const territory = (query.territory || '').trim();
-    if (!territory || !/^\d{2}$/.test(territory)) {
-      throw new BadRequestException(`territory is required and must be exactly 2 digits. Received: '${territory}'`);
+    if (!territory || !isIndianStateCode(territory)) {
+      throw new BadRequestException(
+        `territory is required and must be a valid 2-letter uppercase Indian state code. Received: '${query.territory}'`,
+      );
     }
 
-    const rawPlacement = (query.placement || '').trim().toUpperCase();
-    if (!rawPlacement || (rawPlacement !== 'DESKTOP' && rawPlacement !== 'MOBILE')) {
+    const placement = (query.placement || '').trim();
+    if (!placement || !isAllowedPlacement(placement)) {
       throw new BadRequestException(
         `placement is required and must be either 'DESKTOP' or 'MOBILE'. Received: '${query.placement}'`,
       );
@@ -112,7 +115,7 @@ export class DashboardService {
     // 2. Build cache key
     const cacheKey = this.cacheService.buildKey(
       rawModule,
-      rawPlacement,
+      placement,
       categoryId,
       territory,
       warehouseId,
@@ -146,11 +149,11 @@ export class DashboardService {
       const where: any = {
         module: { equals: rawModule, mode: 'insensitive' },
         categoryId: { equals: categoryId },
-        territory: { equals: territory },
-        placement: { equals: rawPlacement },
+        placement: { equals: placement },
         status: true,
         effectiveFrom: { lte: endOfTodayIst },
         effectiveTo: { gte: startOfTodayIst },
+        territory: { in: [territory, 'ALL'] },
       };
 
       if (rawModule === 'LITE') {
@@ -162,8 +165,23 @@ export class DashboardService {
         orderBy: [{ sequence: 'asc' }, { widgetId: 'asc' }],
       });
 
+      // Exact-state territory priority: exact requested state wins over ALL for the same sequence
+      const selectedMap = new Map<number, any>();
+      for (const record of records) {
+        const existing = selectedMap.get(record.sequence);
+        if (!existing) {
+          selectedMap.set(record.sequence, record);
+        } else if (record.territory === territory && existing.territory !== territory) {
+          selectedMap.set(record.sequence, record);
+        }
+      }
+
+      const deduplicatedRecords = Array.from(selectedMap.values()).sort(
+        (a, b) => a.sequence - b.sequence || a.widgetId.localeCompare(b.widgetId),
+      );
+
       // Format response with default values and clean envelope
-      return formatDashboardResponse(rawModule, categoryId, territory, records, warehouseId);
+      return formatDashboardResponse(rawModule, categoryId, territory, deduplicatedRecords, warehouseId);
     });
   }
 
@@ -191,7 +209,7 @@ export class DashboardService {
         widgetId,
         widgetName: (dto.widget_name || (dto as any).Widget_name || '').trim(),
         widgetRedirectTo: (dto.widget_redirect_to ?? (dto as any).Redirected_to)?.trim() || '',
-        placement: (dto.placement ?? (dto as any).Placement)?.trim() || 'DESKTOP',
+        placement: (dto.placement ?? (dto as any).Placement)?.trim() || ALLOWED_PLACEMENTS[0],
         sequence: dto.sequence !== undefined && dto.sequence !== null ? Number(dto.sequence) : 0,
         territory: (dto.territory ?? (dto as any).Territory)?.trim() || '56',
         items: processedItems,
@@ -260,6 +278,7 @@ export class DashboardService {
         orderBy: [
           { module: 'asc' },
           { categoryId: 'asc' },
+          { placement: 'asc' },
           { sequence: 'asc' },
           { widgetId: 'asc' },
         ],
@@ -405,12 +424,12 @@ export class DashboardService {
   }
 
   /**
-   * Admin Seed: Inserts the 169 HAATZA dashboard rows using ON CONFLICT (widget_id) DO NOTHING.
+   * Admin Seed: Inserts the 628 HAATZA + LITE dashboard rows using ON CONFLICT (widget_id) DO NOTHING.
    * Safe to rerun, never overwrites existing items or legacy rows.
    */
   async seedDashboard(): Promise<{ totalAttempted: number; totalInserted: number }> {
-    const { generate169DashboardRows } = await import('./dashboard-seed.util');
-    const rows = generate169DashboardRows();
+    const { generate628DashboardRows } = await import('./dashboard-seed.util');
+    const rows = generate628DashboardRows();
     let totalInserted = 0;
 
     for (const r of rows) {
