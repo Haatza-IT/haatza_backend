@@ -11,10 +11,12 @@ import {
   HttpCode,
   HttpStatus,
   UsePipes,
+  UseGuards,
   Inject,
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { AdminAuthGuard } from '../../common/guards/admin-auth.guard';
 import {
   createProductSchema,
   updateProductSchema,
@@ -38,6 +40,7 @@ export class ProductsController {
   /**
    * Creates a new product with all 59 fields.
    */
+  @UseGuards(AdminAuthGuard)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async createProduct(
@@ -67,6 +70,7 @@ export class ProductsController {
   /**
    * Updates an existing product completely.
    */
+  @UseGuards(AdminAuthGuard)
   @Put(':id')
   async updateProduct(
     @Param('id') id: string,
@@ -78,6 +82,7 @@ export class ProductsController {
   /**
    * Updates an existing product partially.
    */
+  @UseGuards(AdminAuthGuard)
   @Patch(':id')
   async patchProduct(
     @Param('id') id: string,
@@ -89,6 +94,7 @@ export class ProductsController {
   /**
    * Deletes a product by ID.
    */
+  @UseGuards(AdminAuthGuard)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async deleteProduct(

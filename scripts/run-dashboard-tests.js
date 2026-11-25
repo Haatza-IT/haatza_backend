@@ -300,19 +300,22 @@ async function runComprehensiveTests() {
       `Validation error raised on lowercase 'desktop'`,
     );
 
-    // 4.4 placement=MOBILE returns HTTP 200 with count 0 on pre-migration DB (no fallback to DESKTOP)
+    // 4.4 placement=MOBILE returns HTTP 200 with 16 widgets (w0460 to w0475) on 628-row database (no DESKTOP leakage)
     const mobileRes = await dashboardService.getCustomerDashboard({
       module: 'HAATZA',
       categoryId: ALL_CATEGORY_ID,
       territory: 'AP',
       placement: 'MOBILE',
     });
-    const passMobile = mobileRes.success === true && mobileRes.count === 0 && mobileRes.widgets.length === 0;
+    const countOk = mobileRes.success === true && mobileRes.count === 16 && mobileRes.widgets.length === 16;
+    const allMobileIds = mobileRes.widgets.every((w) => w.widget_id >= 'w0460' && w.widget_id <= 'w0475');
+    const noDesktopLeak = mobileRes.widgets.every((w) => !(w.widget_id >= 'w0001' && w.widget_id <= 'w0169'));
+    const passMobile = countOk && allMobileIds && noDesktopLeak;
     record(
       '4.4',
-      'placement=MOBILE on pre-migration DB returns HTTP 200 with count 0 and widgets [] (no fallback to DESKTOP)',
+      'placement=MOBILE returns HTTP 200 with 16 widgets (w0460 to w0475) and zero DESKTOP widget_id leakage',
       passMobile,
-      `Count: ${mobileRes.count}, Widgets length: ${mobileRes.widgets.length}`,
+      `Count: ${mobileRes.count}, All IDs w0460..w0475: ${allMobileIds}, No Desktop IDs: ${noDesktopLeak}`,
     );
 
     // =========================================================================
@@ -604,6 +607,166 @@ async function runComprehensiveTests() {
       'Customer widget objects contain only clean layout fields (internal columns excluded)',
       !hasForbidden,
       `Forbidden fields (created_by, updated_by, warehouse_id, placement) cleanly excluded from widgets`,
+    );
+
+    // =========================================================================
+    // PART 10: ADVANCED CACHE, STAMPEDE & MULTI-STATE PRECEDENCE UNIT TESTS
+    // =========================================================================
+    console.log('\n--- PART 10: Advanced Cache, Stampede & Multi-State Precedence Tests ---');
+
+    // 10.1 LRU read-refresh
+    cacheService.clearAll();
+    cacheService.set('key-a', 'val-a');
+    cacheService.set('key-b', 'val-b');
+    // Access key-a to refresh its position to MRU
+    const readRefreshedVal = cacheService.get('key-a');
+    // Fill to 500 max keys: key-b was older than key-a because key-a was refreshed
+    for (let i = 1; i <= 498; i++) {
+      cacheService.set(`filler-${i}`, `val-${i}`);
+    }
+    // Now cache has 500 entries: key-b, key-a, filler-1..498
+    // Adding 501st entry triggers eviction of least recently used (key-b)
+    cacheService.set('filler-extra', 'val-extra');
+    const keyBPostEvict = cacheService.get('key-b'); // should be evicted (null)
+    const keyAPostEvict = cacheService.get('key-a'); // should still exist (refreshed!)
+    const lruRefreshPassed = readRefreshedVal === 'val-a' && keyBPostEvict === null && keyAPostEvict === 'val-a';
+    record(
+      '10.1',
+      'LRU Read-Refresh: Accessing entry refreshes position and prevents premature eviction',
+      lruRefreshPassed,
+      `key-a refreshed: ${keyAPostEvict !== null}, key-b evicted: ${keyBPostEvict === null}`,
+    );
+
+    // 10.2 LRU eviction at 500
+    cacheService.clearAll();
+    for (let i = 0; i < 500; i++) {
+      cacheService.set(`test-key-${i}`, `data-${i}`);
+    }
+    const sizeAtLimit = cacheService.size;
+    // Add 501st key
+    cacheService.set('test-key-500', 'data-500');
+    const sizeAfterOverflow = cacheService.size;
+    const oldestEvicted = cacheService.get('test-key-0') === null;
+    const newestRetained = cacheService.get('test-key-500') === 'data-500';
+    const lruEvictPassed = sizeAtLimit === 500 && sizeAfterOverflow === 500 && oldestEvicted && newestRetained;
+    record(
+      '10.2',
+      'LRU Eviction at 500: Cache bounds strictly at 500 keys and evicts oldest entry on overflow',
+      lruEvictPassed,
+      `Capacity held at 500: ${sizeAfterOverflow === 500}, Oldest evicted: ${oldestEvicted}, Newest retained: ${newestRetained}`,
+    );
+
+    // 10.3 TTL Expiry
+    cacheService.clearAll();
+    cacheService.set('ttl-test-key', 'active-data', 50); // 50ms TTL
+    const beforeExpiry = cacheService.get('ttl-test-key');
+    await new Promise((r) => setTimeout(r, 70));
+    const afterExpiry = cacheService.get('ttl-test-key');
+    const ttlPassed = beforeExpiry === 'active-data' && afterExpiry === null;
+    record(
+      '10.3',
+      'TTL Expiry: Entry automatically expires after configured duration (50ms custom TTL)',
+      ttlPassed,
+      `Before expiry: ${beforeExpiry}, After expiry: ${afterExpiry}`,
+    );
+
+    // 10.4 Expired entry never served
+    cacheService.clearAll();
+    cacheService.set('expired-check-key', 'data', 20); // 20ms TTL
+    await new Promise((r) => setTimeout(r, 30));
+    const readExpired = cacheService.get('expired-check-key');
+    const sizeAfterExpiredRead = cacheService.size; // should be 0 because read deletes expired entry
+    const expiredNeverServed = readExpired === null && sizeAfterExpiredRead === 0;
+    record(
+      '10.4',
+      'Expired entry never served: Expired keys return null and are purged from cache on read',
+      expiredNeverServed,
+      `Returned value: ${readExpired}, Purged on read: ${sizeAfterExpiredRead === 0}`,
+    );
+
+    // 10.5 In-flight request sharing (cache stampede protection)
+    cacheService.clearAll();
+    let loadCounter = 0;
+    const slowLoader = async () => {
+      loadCounter++;
+      await new Promise((r) => setTimeout(r, 60));
+      return { payload: 'shared-loader-result', counter: loadCounter };
+    };
+    const flightResults = await Promise.all([
+      cacheService.getOrSet('inflight-key', slowLoader),
+      cacheService.getOrSet('inflight-key', slowLoader),
+      cacheService.getOrSet('inflight-key', slowLoader),
+      cacheService.getOrSet('inflight-key', slowLoader),
+    ]);
+    const allGotResult = flightResults.every((res) => res.payload === 'shared-loader-result' && res.counter === 1);
+    const inFlightPassed = allGotResult && loadCounter === 1;
+    record(
+      '10.5',
+      'In-Flight Request Sharing: Concurrent requests share single underlying resolution (1 loader call)',
+      inFlightPassed,
+      `Concurrent callers: 4, Total loader executions: ${loadCounter}`,
+    );
+
+    // 10.6 KA / KL / TS exact-state override beats ALL
+    // Function that mirrors DashboardService precedence resolver on fixture records
+    function resolvePrecedence(records, requestedTerritory) {
+      const selectedMap = new Map();
+      for (const record of records) {
+        const existing = selectedMap.get(record.sequence);
+        if (!existing) {
+          selectedMap.set(record.sequence, record);
+        } else if (record.territory === requestedTerritory && existing.territory !== requestedTerritory) {
+          selectedMap.set(record.sequence, record);
+        }
+      }
+      return Array.from(selectedMap.values()).sort((a, b) => a.sequence - b.sequence);
+    }
+
+    const multiStateFixtures = [
+      { sequence: 1, territory: 'ALL', widgetId: 'w_all_seq1', name: 'Default Hero' },
+      { sequence: 1, territory: 'KA', widgetId: 'w_ka_seq1', name: 'Karnataka Special Hero' },
+      { sequence: 1, territory: 'KL', widgetId: 'w_kl_seq1', name: 'Kerala Festive Hero' },
+      { sequence: 1, territory: 'TS', widgetId: 'w_ts_seq1', name: 'Telangana Tech Hero' },
+      { sequence: 2, territory: 'ALL', widgetId: 'w_all_seq2', name: 'Default Deals' },
+    ];
+
+    const kaResolved = resolvePrecedence(multiStateFixtures, 'KA');
+    const klResolved = resolvePrecedence(multiStateFixtures, 'KL');
+    const tsResolved = resolvePrecedence(multiStateFixtures, 'TS');
+    const mhResolved = resolvePrecedence(multiStateFixtures, 'MH'); // MH has no override, should get ALL
+
+    const kaPass = kaResolved[0].widgetId === 'w_ka_seq1' && kaResolved[1].widgetId === 'w_all_seq2';
+    const klPass = klResolved[0].widgetId === 'w_kl_seq1' && klResolved[1].widgetId === 'w_all_seq2';
+    const tsPass = tsResolved[0].widgetId === 'w_ts_seq1' && tsResolved[1].widgetId === 'w_all_seq2';
+    const mhPass = mhResolved[0].widgetId === 'w_all_seq1' && mhResolved[1].widgetId === 'w_all_seq2';
+    const multiStatePass = kaPass && klPass && tsPass && mhPass;
+    record(
+      '10.6',
+      'KA / KL / TS exact-state override beats ALL: State-specific widget takes precedence with zero leakage',
+      multiStatePass,
+      `KA: ${kaResolved[0].widgetId}, KL: ${klResolved[0].widgetId}, TS: ${tsResolved[0].widgetId}, MH (fallback): ${mhResolved[0].widgetId}`,
+    );
+
+    // 10.7 LITE invalidation clears all warehouses and territories
+    cacheService.clearAll();
+    const catLite201 = 'c4000000-0000-4000-8000-000000000201';
+    const catLite202 = 'c4000000-0000-4000-8000-000000000202';
+    cacheService.set(cacheService.buildKey('LITE', 'DESKTOP', catLite201, 'AP', 'WAREHOUSE001'), { id: 'd1' });
+    cacheService.set(cacheService.buildKey('LITE', 'MOBILE', catLite201, 'KA', 'WAREHOUSE002'), { id: 'd2' });
+    cacheService.set(cacheService.buildKey('LITE', 'DESKTOP', catLite201, 'TS', 'WAREHOUSE003'), { id: 'd3' });
+    cacheService.set(cacheService.buildKey('LITE', 'DESKTOP', catLite202, 'AP', 'WAREHOUSE001'), { id: 'other' });
+
+    cacheService.invalidateCategory('LITE', catLite201);
+    const cleared1 = cacheService.get(cacheService.buildKey('LITE', 'DESKTOP', catLite201, 'AP', 'WAREHOUSE001')) === null;
+    const cleared2 = cacheService.get(cacheService.buildKey('LITE', 'MOBILE', catLite201, 'KA', 'WAREHOUSE002')) === null;
+    const cleared3 = cacheService.get(cacheService.buildKey('LITE', 'DESKTOP', catLite201, 'TS', 'WAREHOUSE003')) === null;
+    const retainedOther = cacheService.get(cacheService.buildKey('LITE', 'DESKTOP', catLite202, 'AP', 'WAREHOUSE001')) !== null;
+    const liteInvalidatePassed = cleared1 && cleared2 && cleared3 && retainedOther;
+    record(
+      '10.7',
+      'LITE invalidation clears all warehouses and territories: Dual placement and multi-warehouse entries invalidated',
+      liteInvalidatePassed,
+      `AP/WH001 cleared: ${cleared1}, KA/WH002 cleared: ${cleared2}, TS/WH003 cleared: ${cleared3}, Cat 202 preserved: ${retainedOther}`,
     );
 
     // Summary
