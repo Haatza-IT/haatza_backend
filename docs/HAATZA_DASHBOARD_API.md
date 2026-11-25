@@ -976,7 +976,7 @@ GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101
 
 **Endpoint:**
 ```http
-GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&warehouseId=WAREHOUSE001&territory=AP&placement=DESKTOP
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&warehouseId=WAREHOUSE001&placement=DESKTOP
 ```
 
 **Purpose:** Fetches the customer dashboard layout for Haatza LITE quick commerce, featuring express delivery banners, daily essentials, and fresh produce.
@@ -988,8 +988,8 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&w
 | `module` | **Yes** | `string` | — | Dashboard module identifier. Must be strictly `LITE` (case-insensitive). Missing, invalid, or legacy values reject with HTTP 400 Bad Request. |
 | `categoryId` | **Yes** | `string` | — | Category UUID (e.g. `c4000000-0000-4000-8000-000000000201` for All, `c4000000-0000-4000-8000-000000000202` for Fruits and Vegetables). Filters widgets configured with a category match. Missing or empty category ID rejects with HTTP 400 Bad Request. |
 | `warehouseId` | **Yes** | `string` | — | Dark store warehouse identifier. Must be one of the 5 supported dark-store warehouses: `WAREHOUSE001`, `WAREHOUSE002`, `WAREHOUSE003`, `WAREHOUSE004`, `WAREHOUSE005`. Required for LITE module. Missing or invalid warehouse ID rejects with HTTP 400 Bad Request. |
-| `territory` | **Yes** | `string` | — | Exact 2-letter uppercase Indian state code (one of the 28 supported Indian states: `AP, AR, AS, BR, CG, GA, GJ, HR, HP, JH, KA, KL, MP, MH, MN, ML, MZ, NL, OD, PB, RJ, SK, TN, TS, TR, UP, UK, WB`). Missing, numeric PIN codes (e.g. `56`, `560001`), lowercase (`ap`), `ALL`, or non-state strings reject with HTTP 400 Bad Request. |
 | `placement` | **Yes** | `string` | — | Layout placement filter. Must be strictly `DESKTOP` or `MOBILE` (case-sensitive uppercase). Missing or invalid values reject with HTTP 400 Bad Request. |
+| `territory` | **No** (Ignored) | `string` | — | **Permanently removed for LITE.** Territory is NOT required, NOT validated, and NOT used in database queries. If sent (any value, valid or not, e.g. `territory=AP`, `territory=56`, `territory=ZZ`, or empty), it is safely ignored and never causes a 400 Bad Request. |
 | `page` | No (Opt-in) | `integer` | — | 1-based page number (integer $\ge 1$). When neither `page` nor `limit` is sent, pagination is NOT enabled (all items returned in full with NO pagination object). When opt-in pagination is triggered by sending `page` and/or `limit`, `page` defaults to 1. Invalid values ($\le 0$, decimals, strings, empty, duplicates) reject with HTTP 400 Bad Request. |
 | `limit` | No (Opt-in) | `integer` | — | Items per page (integer 1 to 50). When neither `page` nor `limit` is sent, pagination is NOT enabled (all items returned in full with NO pagination object). When opt-in pagination is triggered, `limit` defaults to 20. Allowed alone (page defaults to 1). Values $< 1$ or $> 50$, decimals, strings, empty, or duplicate parameters reject with HTTP 400 Bad Request. |
 
@@ -997,9 +997,9 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&w
 
 | No | Category Name | Category UUID (`categoryId`) | Widgets & Sequences |
 |:---:|---|---|---|
-| 1 | **All** | `c4000000-0000-4000-8000-000000000201` | 7 widgets (sequences 1 to 7: Hero Banner, Everyday Essentials, Dispatch Belt, Promo Banner, Offer Banner, Fresh Fruits, Household Cleaning) |
-| 2 | **Fruits and Vegetables** | `c4000000-0000-4000-8000-000000000202` | 2 widgets (seq 1 Hero Banner [2 banners], seq 2 Category Products [2 products]) |
-| 3 | **Daily and Breakfast** | `c4000000-0000-4000-8000-000000000203` | 2 widgets (seq 1 Hero Banner [2 banners], seq 2 Category Products [2 products]) |
+| 1 | **All** | `c4000000-0000-4000-8000-000000000201` | 7 widgets (sequences 1 to 7: Hero Banner [1 item], Everyday Essentials [6 items], Dispatch Belt [1 item], Promo Banner [1 item], Offer Banner [1 item], Fresh Fruits [6 items], Household Cleaning [6 items] — items signature: `[1, 6, 1, 1, 1, 6, 6]`) |
+| 2 | **Fruits and Vegetables** | `c4000000-0000-4000-8000-000000000202` | 2 widgets (seq 1 Hero Banner [2 banners], seq 2 Category Products [30 approved products]) |
+| 3 | **Daily and Breakfast** | `c4000000-0000-4000-8000-000000000203` | 2 widgets (seq 1 Hero Banner [2 banners], seq 2 Category Products [30 approved products]) |
 | 4 | **Snacks and Beverages** | `c4000000-0000-4000-8000-000000000204` | 2 widgets (seq 1 Hero Banner [2 banners], seq 2 Category Products [2 products]) |
 | 5 | **Household Cleaning** | `c4000000-0000-4000-8000-000000000205` | 2 widgets (seq 1 Hero Banner [2 banners], seq 2 Category Products [2 products]) |
 | 6 | **Personal Care** | `c4000000-0000-4000-8000-000000000206` | 2 widgets (seq 1 Hero Banner [2 banners], seq 2 Category Products [2 products]) |
@@ -1014,7 +1014,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&w
 - Each warehouse block consists of 29 widgets (7 widgets for Category 201 + 22 widgets across Categories 202–212).
 - 5 Warehouses (`WAREHOUSE001` through `WAREHOUSE005`) × 2 Placements (`DESKTOP`, `MOBILE`) = 10 warehouse blocks.
 - Exactly 290 LITE rows total (`w0170` through `w0459`).
-- Initial database territory is `ALL`. Territory query requests with an exact state code (e.g. `territory=AP`) match `ALL` default records and override with state-specific records if localized rows are defined.
+- LITE queries use `module`, `categoryId`, `placement`, `warehouseId`, `status`, and effective dates only. Territory is not filtered.
 
 ### Complete LITE Success Response Example (`200 OK`)
 
@@ -1023,7 +1023,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&w
   "success": true,
   "module": "LITE",
   "categoryId": "c4000000-0000-4000-8000-000000000201",
-  "territory": "AP",
+  "warehouseId": "WAREHOUSE001",
   "count": 7,
   "widgets": [
     {
@@ -1050,8 +1050,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&w
         }
       ]
     }
-  ],
-  "warehouseId": "WAREHOUSE001"
+  ]
 }
 ```
 
@@ -1111,7 +1110,7 @@ When opt-in pagination is active and a widget has more items than `limit`, a `pa
 #### Example 1: LITE Category 202 — Default (No Parameters: Opt-In Disabled, All 30 Items, No Pagination Field)
 **Request:**
 ```http
-GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=DESKTOP&warehouseId=WAREHOUSE001
 ```
 **Response (`200 OK`):**
 ```json
@@ -1119,7 +1118,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&t
   "success": true,
   "module": "LITE",
   "categoryId": "c4000000-0000-4000-8000-000000000202",
-  "territory": "AP",
+  "warehouseId": "WAREHOUSE001",
   "count": 2,
   "widgets": [
     {
@@ -1175,7 +1174,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&t
 #### Example 2: LITE Category 202 — Opt-In Page 1 (`page=1` or `limit=20`: First 20 of 30 Items with Pagination)
 **Request:**
 ```http
-GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&page=1
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=DESKTOP&warehouseId=WAREHOUSE001&page=1
 ```
 **Response (`200 OK`):**
 ```json
@@ -1183,7 +1182,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&t
   "success": true,
   "module": "LITE",
   "categoryId": "c4000000-0000-4000-8000-000000000202",
-  "territory": "AP",
+  "warehouseId": "WAREHOUSE001",
   "count": 2,
   "widgets": [
     {
@@ -1215,7 +1214,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&t
 #### Example 2: LITE Category 202 — Page 2 (Remaining 10 Items)
 **Request:**
 ```http
-GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&page=2
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=DESKTOP&warehouseId=WAREHOUSE001&page=2
 ```
 **Response (`200 OK`):**
 ```json
@@ -1223,7 +1222,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&t
   "success": true,
   "module": "LITE",
   "categoryId": "c4000000-0000-4000-8000-000000000202",
-  "territory": "AP",
+  "warehouseId": "WAREHOUSE001",
   "count": 2,
   "widgets": [
     {
@@ -1287,7 +1286,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&t
 #### Example 3: LITE Category 202 — Page 3 (Beyond Last Page)
 **Request:**
 ```http
-GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=MOBILE&warehouseId=WAREHOUSE003&page=3
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=MOBILE&warehouseId=WAREHOUSE003&page=3
 ```
 **Response (`200 OK`):**
 ```json
@@ -1295,7 +1294,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&t
   "success": true,
   "module": "LITE",
   "categoryId": "c4000000-0000-4000-8000-000000000202",
-  "territory": "AP",
+  "warehouseId": "WAREHOUSE003",
   "count": 2,
   "widgets": [
     {
@@ -1348,7 +1347,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&t
 #### Example 4: LITE Category 202 — Full Catalog (`limit=50`)
 **Request:**
 ```http
-GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&limit=50
+GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=DESKTOP&warehouseId=WAREHOUSE001&limit=50
 ```
 **Response (`200 OK`):**
 ```json
@@ -1356,7 +1355,7 @@ GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&t
   "success": true,
   "module": "LITE",
   "categoryId": "c4000000-0000-4000-8000-000000000202",
-  "territory": "AP",
+  "warehouseId": "WAREHOUSE001",
   "count": 2,
   "widgets": [
     {
@@ -1391,7 +1390,7 @@ GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101
 
 1. **Limit exceeds 50 (`limit=51`):**
    ```http
-   GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&limit=51
+   GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=DESKTOP&warehouseId=WAREHOUSE001&limit=51
    ```
    **Response (`400 Bad Request`):**
    ```json
@@ -1409,7 +1408,7 @@ GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101
 
 2. **Invalid page (`page=0`):**
    ```http
-   GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=MOBILE&warehouseId=WAREHOUSE001&page=0
+   GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=MOBILE&warehouseId=WAREHOUSE001&page=0
    ```
    **Response (`400 Bad Request`):**
    ```json
@@ -1427,7 +1426,7 @@ GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101
 
 3. **Duplicate parameter (`page=1&page=2`):**
    ```http
-   GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&territory=AP&placement=DESKTOP&warehouseId=WAREHOUSE001&page=1&page=2
+   GET /api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=DESKTOP&warehouseId=WAREHOUSE001&page=1&page=2
    ```
    **Response (`400 Bad Request`):**
    ```json
@@ -1454,11 +1453,40 @@ GET /api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101
 - **LRU Policy:** On every cache hit (`get`), the key is re-inserted to mark it as Most Recently Used. When cache exceeds 500 entries on insertion, the Least Recently Used (oldest accessed) key is evicted.
 - **Standardized Key Structures (Opt-In Pagination Aware):**
   - **Unpaginated (No page/limit sent):** Original format without `:p/:l` suffix:
-    - **HAATZA:** `dashboard:HAATZA:<placement>:<categoryId>:<territory>`
-    - **LITE:** `dashboard:LITE:<placement>:<categoryId>:<territory>:<warehouseId>`
+    - **HAATZA:** `dashboard:HAATZA:<placement>:<categoryId>:<territory>` (territory required)
+    - **LITE:** `dashboard:LITE:<placement>:<categoryId>:<warehouseId>` (no territory component)
   - **Paginated (When page and/or limit is sent):** Format with `:p<page>:l<limit>` suffix:
-    - **HAATZA:** `dashboard:HAATZA:<placement>:<categoryId>:<territory>:p<page>:l<limit>`
-    - **LITE:** `dashboard:LITE:<placement>:<categoryId>:<territory>:<warehouseId>:p<page>:l<limit>`
+    - **HAATZA:** `dashboard:HAATZA:<placement>:<categoryId>:<territory>:p<page>:l<limit>` (territory required)
+    - **LITE:** `dashboard:LITE:<placement>:<categoryId>:<warehouseId>:p<page>:l<limit>` (no territory component)
+
+### Real Local Examples with Placement
+
+#### 1. HAATZA Customer Dashboard (Territory Required)
+```bash
+# HAATZA Desktop Layout (Category 101 All, Territory TN -> 16 widgets)
+curl -X GET "http://localhost:3000/api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&placement=DESKTOP&territory=TN"
+
+# HAATZA Mobile Layout (Category 101 All, Territory AP -> 14 widgets)
+curl -X GET "http://localhost:3000/api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&placement=MOBILE&territory=AP"
+
+# HAATZA without territory parameter strictly fails with HTTP 400 Bad Request
+curl -i -X GET "http://localhost:3000/api/dashboard?module=HAATZA&categoryId=c4000000-0000-4000-8000-000000000101&placement=DESKTOP"
+```
+
+#### 2. LITE Customer Dashboard (No Territory Filter)
+```bash
+# LITE Desktop Layout (Category 201 All, WAREHOUSE001 -> 7 widgets [1, 6, 1, 1, 1, 6, 6] items)
+curl -X GET "http://localhost:3000/api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&placement=DESKTOP&warehouseId=WAREHOUSE001"
+
+# LITE Category 202 Unpaginated (Hero Banner: 2 items, Category Products: 30 items)
+curl -X GET "http://localhost:3000/api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=DESKTOP&warehouseId=WAREHOUSE001"
+
+# LITE Category 202 Paginated (page=1&limit=20 -> Hero Banner: 2 items unpaginated, Category Products: 20 items paginated)
+curl -X GET "http://localhost:3000/api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000202&placement=DESKTOP&warehouseId=WAREHOUSE001&page=1&limit=20"
+
+# LITE with territory sent (e.g. territory=AP or territory=56): safely ignored, returns identical items and no territory in envelope
+curl -X GET "http://localhost:3000/api/dashboard?module=LITE&categoryId=c4000000-0000-4000-8000-000000000201&placement=DESKTOP&warehouseId=WAREHOUSE001&territory=AP"
+```
 - **Stampede Prevention:** In-flight promise deduplication ensures multiple concurrent misses share a single database lookup.
 - **Invalidation:** Category invalidation loops across `ALLOWED_PLACEMENTS` (`DESKTOP`, `MOBILE`) and clears both unpaginated and all paginated variants (`:p*:l*`) of the category simultaneously.
 

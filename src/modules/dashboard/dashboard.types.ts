@@ -57,7 +57,7 @@ export interface CustomerDashboardResponse {
   success: boolean;
   module: string;
   categoryId: string;
-  territory: string;
+  territory?: string;
   warehouseId?: string;
   count: number;
   widgets: CleanDashboardWidget[];
@@ -66,7 +66,7 @@ export interface CustomerDashboardResponse {
 export interface DashboardQueryDto {
   module: string;
   categoryId: string;
-  territory: string;
+  territory?: string;
   placement: AllowedPlacement;
   warehouseId?: string;
   raw?: boolean;

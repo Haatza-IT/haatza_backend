@@ -95,10 +95,12 @@ export class DashboardService {
     }
 
     const territory = (query.territory || '').trim();
-    if (!territory || !isIndianStateCode(territory)) {
-      throw new BadRequestException(
-        `territory is required and must be a valid 2-letter uppercase Indian state code. Received: '${query.territory}'`,
-      );
+    if (rawModule === 'HAATZA') {
+      if (!territory || !isIndianStateCode(territory)) {
+        throw new BadRequestException(
+          `territory is required and must be a valid 2-letter uppercase Indian state code. Received: '${query.territory}'`,
+        );
+      }
     }
 
     const placement = (query.placement || '').trim();
@@ -121,7 +123,7 @@ export class DashboardService {
       rawModule,
       placement,
       categoryId,
-      territory,
+      rawModule === 'HAATZA' ? territory : undefined,
       warehouseId,
       pagination.page,
       pagination.limit,
@@ -147,8 +149,8 @@ export class DashboardService {
       // Build database query filter:
       // 1. category_id equals requested categoryId
       // 2. module equals requested module
-      // 3. territory equals requested territory
-      // 4. placement equals requested placement (DESKTOP or MOBILE)
+      // 3. placement equals requested placement (DESKTOP or MOBILE)
+      // 4. HAATZA only: territory in [territory, 'ALL']
       // 5. LITE only: warehouse_id equals requested warehouseId
       // 6. status = true
       // 7. Today (IST) is between effective_from and effective_to. The last day counts fully.
@@ -159,10 +161,11 @@ export class DashboardService {
         status: true,
         effectiveFrom: { lte: endOfTodayIst },
         effectiveTo: { gte: startOfTodayIst },
-        territory: { in: [territory, 'ALL'] },
       };
 
-      if (rawModule === 'LITE') {
+      if (rawModule === 'HAATZA') {
+        where.territory = { in: [territory, 'ALL'] };
+      } else if (rawModule === 'LITE') {
         where.warehouseId = { equals: warehouseId };
       }
 
@@ -171,14 +174,26 @@ export class DashboardService {
         orderBy: [{ sequence: 'asc' }, { widgetId: 'asc' }],
       });
 
-      // Exact-state territory priority: exact requested state wins over ALL for the same sequence
+      // Exact-state territory priority for HAATZA; deduplication by sequence for LITE
       const selectedMap = new Map<number, any>();
       for (const record of records) {
         const existing = selectedMap.get(record.sequence);
         if (!existing) {
           selectedMap.set(record.sequence, record);
-        } else if (record.territory === territory && existing.territory !== territory) {
-          selectedMap.set(record.sequence, record);
+        } else if (rawModule === 'HAATZA') {
+          // Exact-state territory priority: exact requested state wins over ALL for the same sequence
+          if (record.territory === territory && existing.territory !== territory) {
+            selectedMap.set(record.sequence, record);
+          }
+        } else if (rawModule === 'LITE') {
+          // Two rows with the same logical widget (sequence) must never both be returned:
+          // if duplicate sequences occur, keep the lowest widget_id and report/log it
+          this.logger.warn(
+            `Duplicate sequence ${record.sequence} detected in LITE module for category ${categoryId}, warehouse ${warehouseId}. Keeping lowest widget_id '${existing.widgetId < record.widgetId ? existing.widgetId : record.widgetId}'`,
+          );
+          if (record.widgetId.localeCompare(existing.widgetId) < 0) {
+            selectedMap.set(record.sequence, record);
+          }
         }
       }
 
@@ -190,7 +205,7 @@ export class DashboardService {
       return formatDashboardResponse(
         rawModule,
         categoryId,
-        territory,
+        rawModule === 'HAATZA' ? territory : undefined,
         deduplicatedRecords,
         warehouseId,
         pagination.page,

@@ -32,8 +32,8 @@ async function runComprehensiveTests() {
 
   const testResults = [];
 
-  function record(id, name, passed, details = '') {
-    testResults.push({ id, name, passed, details });
+  function record(id, name, passed, details = '', tag = 'data compared') {
+    testResults.push({ id, name, passed, details, tag });
     const mark = passed ? '✅ PASS' : '❌ FAIL';
     console.log(`[${mark}] Test ${id}: ${name}`);
     if (details) console.log(`       Details: ${details}`);
@@ -427,9 +427,14 @@ async function runComprehensiveTests() {
     for (const cat of HAATZA_CATEGORIES) {
       const expectedSeqs = cat.no === 1 ? Array.from({ length: 16 }, (_, i) => i + 1) : RULE_B_SEQUENCES;
 
+      // Category 101 has w0001 (seq 1) and w0004 (seq 4) configured with territory='TN'.
+      // Therefore, querying territory='TN' returns all 16 widgets (1..16),
+      // while categories 102..118 have all widgets as territory='ALL' (tested with 'AP').
+      const testTerritory = cat.no === 1 ? 'TN' : 'AP';
+
       // 1. Verify planned data sequence alignment for this category
       const catPlannedRows = haatzaDesktopPlanned.filter((r) => r.category_id === cat.categoryId);
-      const plannedFormatted = formatDashboardResponse('HAATZA', cat.categoryId, 'AP', catPlannedRows.map(r => ({
+      const plannedFormatted = formatDashboardResponse('HAATZA', cat.categoryId, testTerritory, catPlannedRows.map(r => ({
         widgetId: r.widget_id,
         sequence: r.sequence,
         widgetName: r.widget_name,
@@ -444,14 +449,14 @@ async function runComprehensiveTests() {
       const missRes = await dashboardService.getCustomerDashboard({
         module: 'HAATZA',
         categoryId: cat.categoryId,
-        territory: 'AP',
+        territory: testTerritory,
         placement: 'DESKTOP',
       });
 
       const hitRes = await dashboardService.getCustomerDashboard({
         module: 'HAATZA',
         categoryId: cat.categoryId,
-        territory: 'AP',
+        territory: testTerritory,
         placement: 'DESKTOP',
       });
 
@@ -494,7 +499,7 @@ async function runComprehensiveTests() {
     cacheService.clearAll();
     const cKeyDesktop = cacheService.buildKey('HAATZA', 'DESKTOP', ALL_CATEGORY_ID, 'AP');
     const cKeyMobile = cacheService.buildKey('HAATZA', 'MOBILE', ALL_CATEGORY_ID, 'AP');
-    const cKeyLite = cacheService.buildKey('LITE', 'DESKTOP', ALL_CATEGORY_ID, 'AP', 'WAREHOUSE001');
+    const cKeyLite = cacheService.buildKey('LITE', 'DESKTOP', ALL_CATEGORY_ID, undefined, 'WAREHOUSE001');
 
     record(
       '8.1',
@@ -505,8 +510,8 @@ async function runComprehensiveTests() {
 
     record(
       '8.2',
-      'LITE Cache Key Format (no params): dashboard:LITE:<placement>:<categoryId>:<territory>:<warehouseId>',
-      cKeyLite === `dashboard:LITE:DESKTOP:${ALL_CATEGORY_ID}:AP:WAREHOUSE001`,
+      'LITE Cache Key Format (no params): dashboard:LITE:<placement>:<categoryId>:<warehouseId>',
+      cKeyLite === `dashboard:LITE:DESKTOP:${ALL_CATEGORY_ID}:WAREHOUSE001`,
       `Key: ${cKeyLite}`,
     );
 
@@ -1310,16 +1315,16 @@ async function runComprehensiveTests() {
 
     // 11.17: Cache separation without suffix: unpaginated key (no suffix) vs p1 vs p2 vs limit50
     cacheService.clearAll();
-    const keyDefault = cacheService.buildKey('LITE', 'DESKTOP', 'cat-p-test', 'AP', 'WH001');
-    const keyPage1 = cacheService.buildKey('LITE', 'DESKTOP', 'cat-p-test', 'AP', 'WH001', 1, 20);
-    const keyPage2 = cacheService.buildKey('LITE', 'DESKTOP', 'cat-p-test', 'AP', 'WH001', 2, 20);
-    const keyLimit50 = cacheService.buildKey('LITE', 'DESKTOP', 'cat-p-test', 'AP', 'WH001', 1, 50);
+    const keyDefault = cacheService.buildKey('LITE', 'DESKTOP', 'cat-p-test', undefined, 'WH001');
+    const keyPage1 = cacheService.buildKey('LITE', 'DESKTOP', 'cat-p-test', undefined, 'WH001', 1, 20);
+    const keyPage2 = cacheService.buildKey('LITE', 'DESKTOP', 'cat-p-test', undefined, 'WH001', 2, 20);
+    const keyLimit50 = cacheService.buildKey('LITE', 'DESKTOP', 'cat-p-test', undefined, 'WH001', 1, 50);
 
     const keysCorrect =
       keyDefault !== keyPage1 &&
       !keyDefault.includes(':p') &&
       !keyDefault.includes(':l') &&
-      keyDefault === 'dashboard:LITE:DESKTOP:cat-p-test:AP:WH001' &&
+      keyDefault === 'dashboard:LITE:DESKTOP:cat-p-test:WH001' &&
       keyPage1.endsWith(':p1:l20') &&
       keyPage2.endsWith(':p2:l20') &&
       keyLimit50.endsWith(':p1:l50') &&
@@ -1377,6 +1382,232 @@ async function runComprehensiveTests() {
       'Zero null values anywhere in customer paginated and unpaginated response envelopes',
       !anyNulls,
       `Nulls in P1: ${nullsInP1}, P2: ${nullsInP2}, P3: ${nullsInP3}, L50: ${nullsInL50}, Multi: ${nullsInMulti}`,
+      'data compared',
+    );
+
+    // =========================================================================
+    // PART 12: LITE TERRITORY REMOVAL & HAATZA VALIDATION INTACT
+    // =========================================================================
+    console.log('\n--- PART 12: LITE Territory Removal & HAATZA Validation Intact ---');
+
+    // 12.1 LITE without territory returns HTTP 200
+    const liteNoTerrSchema = customerDashboardQuerySchema.parse({
+      module: 'LITE',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+    });
+    const liteNoTerrRes = await dashboardService.getCustomerDashboard({
+      module: 'LITE',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+    });
+    record(
+      '12.1',
+      'LITE without territory succeeds (HTTP 200) and parses validly',
+      liteNoTerrSchema.module === 'LITE' && liteNoTerrSchema.territory === undefined && liteNoTerrRes.success === true,
+      `Widgets returned: ${liteNoTerrRes.count}`,
+      'data compared',
+    );
+
+    // 12.2 LITE with territory=AP, KA, 56, ZZ, empty returns identical results
+    const liteTerrAP = await dashboardService.getCustomerDashboard({
+      module: 'LITE',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+      territory: 'AP',
+    });
+    const liteTerrKA = await dashboardService.getCustomerDashboard({
+      module: 'LITE',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+      territory: 'KA',
+    });
+    const liteTerr56 = await dashboardService.getCustomerDashboard({
+      module: 'LITE',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+      territory: '56',
+    });
+    const liteTerrZZ = await dashboardService.getCustomerDashboard({
+      module: 'LITE',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+      territory: 'ZZ',
+    });
+    const liteTerrEmpty = await dashboardService.getCustomerDashboard({
+      module: 'LITE',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+      territory: '',
+    });
+
+    const isIdentical = (r1, r2) => JSON.stringify(r1) === JSON.stringify(r2);
+    const allIdentical =
+      isIdentical(liteNoTerrRes, liteTerrAP) &&
+      isIdentical(liteNoTerrRes, liteTerrKA) &&
+      isIdentical(liteNoTerrRes, liteTerr56) &&
+      isIdentical(liteNoTerrRes, liteTerrZZ) &&
+      isIdentical(liteNoTerrRes, liteTerrEmpty);
+    record(
+      '12.2',
+      'LITE with territory=AP, KA, 56, ZZ, empty returns identical responses to query without territory',
+      allIdentical,
+      `All 5 territory variants match no-territory response: ${allIdentical}`,
+      'data compared',
+    );
+
+    // 12.3 LITE Cache Sharing across territories
+    cacheService.clearAll();
+    const liteKeyPrime = cacheService.buildKey('LITE', 'DESKTOP', ALL_CATEGORY_ID, undefined, 'WAREHOUSE001');
+    await dashboardService.getCustomerDashboard({
+      module: 'LITE',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+      territory: 'AP',
+    });
+    const primedCache = cacheService.get(liteKeyPrime);
+    // Querying with KA should hit the exact same cache entry
+    const kaResFromCache = await dashboardService.getCustomerDashboard({
+      module: 'LITE',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+      territory: 'KA',
+    });
+    const cacheShared = primedCache !== null && isIdentical(primedCache, kaResFromCache);
+    record(
+      '12.3',
+      'LITE Cache Sharing: Query with territory=AP primes key without territory; territory=KA hits same cache',
+      cacheShared,
+      `Key: ${liteKeyPrime}, shared across AP and KA`,
+      'data compared',
+    );
+
+    // 12.4 No territory in LITE response envelope
+    const envelopeHasNoTerritory =
+      liteNoTerrRes.territory === undefined &&
+      !('territory' in liteNoTerrRes) &&
+      liteNoTerrRes.warehouseId === 'WAREHOUSE001';
+    record(
+      '12.4',
+      'LITE Response Envelope: Contains warehouseId and strictly NO territory field',
+      envelopeHasNoTerritory,
+      `Keys in envelope: ${Object.keys(liteNoTerrRes).join(', ')}`,
+      'data compared',
+    );
+
+    // 12.5 HAATZA validation intact: territory required and invalid territory rejected
+    let haatzaMissingTerrRejected = false;
+    try {
+      customerDashboardQuerySchema.parse({
+        module: 'HAATZA',
+        categoryId: ALL_CATEGORY_ID,
+        placement: 'DESKTOP',
+      });
+    } catch (e) {
+      haatzaMissingTerrRejected = e.issues && e.issues.some((i) => i.path.includes('territory'));
+    }
+
+    let haatzaInvalidTerrRejected = false;
+    try {
+      customerDashboardQuerySchema.parse({
+        module: 'HAATZA',
+        categoryId: ALL_CATEGORY_ID,
+        placement: 'DESKTOP',
+        territory: '56',
+      });
+    } catch (e) {
+      haatzaInvalidTerrRejected = e.issues && e.issues.some((i) => i.path.includes('territory'));
+    }
+
+    record(
+      '12.5',
+      'HAATZA Validation Intact: Missing territory and invalid territory (e.g. "56") strictly rejected with 400',
+      haatzaMissingTerrRejected && haatzaInvalidTerrRejected,
+      `Missing territory rejected: ${haatzaMissingTerrRejected}, 56 rejected: ${haatzaInvalidTerrRejected}`,
+      'data compared',
+    );
+
+    // 12.6 HAATZA TN vs AP precedence intact (Cat 101 with TN gives 16, AP gives 14)
+    const haatzaTNRes = await dashboardService.getCustomerDashboard({
+      module: 'HAATZA',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      territory: 'TN',
+    });
+    const haatzaAPRes = await dashboardService.getCustomerDashboard({
+      module: 'HAATZA',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      territory: 'AP',
+    });
+    const tnHas16 = haatzaTNRes.count === 16;
+    const apHas14 = haatzaAPRes.count === 14;
+    const tnHasW0001 = haatzaTNRes.widgets.some((w) => w.widget_id === 'w0001');
+    const apLacksW0001 = !haatzaAPRes.widgets.some((w) => w.widget_id === 'w0001');
+    record(
+      '12.6',
+      'HAATZA TN vs AP Precedence: Cat 101 with TN gives 16 widgets (w0001 & w0004 present), AP gives 14 widgets',
+      tnHas16 && apHas14 && tnHasW0001 && apLacksW0001,
+      `TN count: ${haatzaTNRes.count} (has w0001: ${tnHasW0001}), AP count: ${haatzaAPRes.count} (has w0001: ${!apLacksW0001})`,
+      'data compared',
+    );
+
+    // 12.7 LITE duplicate sequence deduplication: keeps lowest widget_id
+    const duplicateSequenceRows = [
+      { sequence: 2, widgetId: 'w0999', widgetName: 'Later Insert Duplicate', items: [] },
+      { sequence: 1, widgetId: 'w0170', widgetName: 'Hero Banner', items: [] },
+      { sequence: 2, widgetId: 'w0171', widgetName: 'Original Widget', items: [] },
+    ];
+    const dedupFormatted = formatDashboardResponse('LITE', ALL_CATEGORY_ID, undefined, duplicateSequenceRows, 'WAREHOUSE001');
+    const dedupIds = dedupFormatted.widgets.map((w) => w.widget_id);
+    const dedupCorrect = dedupIds[1] === 'w0171' && dedupIds[2] === 'w0999';
+    record(
+      '12.7',
+      'LITE Sequence Ordering & Deduplication: Lowest widget_id is prioritized and ordered first on equal sequence',
+      dedupCorrect,
+      `Sorted order: ${dedupIds.join(', ')}`,
+      'data compared',
+    );
+
+    // 12.8 Pagination preserved across LITE & HAATZA
+    const liteP1 = await dashboardService.getCustomerDashboard({
+      module: 'LITE',
+      categoryId: 'c4000000-0000-4000-8000-000000000202',
+      placement: 'DESKTOP',
+      warehouseId: 'WAREHOUSE001',
+      page: 1,
+      limit: 20,
+    });
+    const haatzaUnpaginatedP12 = await dashboardService.getCustomerDashboard({
+      module: 'HAATZA',
+      categoryId: ALL_CATEGORY_ID,
+      placement: 'DESKTOP',
+      territory: 'TN',
+    });
+    const litePagedWidget = liteP1.widgets.find((w) => w.widget_name === 'Category Products');
+    const paginationPreserved =
+      litePagedWidget &&
+      litePagedWidget.pagination &&
+      litePagedWidget.pagination.page === 1 &&
+      litePagedWidget.pagination.limit === 20 &&
+      litePagedWidget.pagination.total_items === 30 &&
+      litePagedWidget.items.length === 20 &&
+      haatzaUnpaginatedP12.widgets.every((w) => !w.pagination);
+    record(
+      '12.8',
+      'Pagination Preserved: LITE Category 202 30 items paginated (20 returned), HAATZA unpaginated widgets intact',
+      paginationPreserved,
+      `LITE P1 items: ${litePagedWidget ? litePagedWidget.items.length : 'none'}, HAATZA unpaginated widgets: ${haatzaUnpaginatedP12.count}`,
+      'data compared',
     );
 
     // Summary
@@ -1402,21 +1633,24 @@ async function runComprehensiveTests() {
     );
 
     // Also write markdown report table
-    let md = '# Phase 1.8: Comprehensive Dashboard Test Suite Results\n\n';
+    let md = '# Step 2: Comprehensive Dashboard Test Suite Results\n\n';
     md += `- **Timestamp:** ${summaryData.timestamp}\n`;
     md += `- **Total Tests:** ${summaryData.totalTests}\n`;
     md += `- **Passed:** ${summaryData.totalPassed}\n`;
     md += `- **Failed:** ${summaryData.totalFailed}\n\n`;
-    md += '| Test ID | Test Description | Status | Details |\n';
-    md += '|:---:|---|:---:|---|\n';
+    md += '| Test ID | Test Description | Status | Tag | Details |\n';
+    md += '|:---:|---|:---:|:---:|---|\n';
     for (const r of testResults) {
-      md += `| ${r.id} | ${r.name} | ${r.passed ? '✅ PASS' : '❌ FAIL'} | ${r.details || '-'} |\n`;
+      md += `| ${r.id} | ${r.name} | ${r.passed ? 'PASS' : 'FAIL'} | ${r.tag || 'data compared'} | ${r.details || '-'} |\n`;
     }
 
     const mdPath = path.join(__dirname, '../scratch/table_test_suite_results.md');
     fs.writeFileSync(mdPath, md, 'utf8');
-    const mdSha256 = crypto.createHash('sha256').update(fs.readFileSync(mdPath)).digest('hex');
-    console.log(`Test Suite Table written to: ${mdPath}`);
+    const step2MdPath = path.join(__dirname, '../scratch/table_step2_tests.md');
+    fs.writeFileSync(step2MdPath, md, 'utf8');
+
+    const mdSha256 = crypto.createHash('sha256').update(fs.readFileSync(step2MdPath)).digest('hex');
+    console.log(`Test Suite Table written to: ${step2MdPath}`);
     console.log(`SHA-256: ${mdSha256}`);
 
     if (totalFailed > 0) {

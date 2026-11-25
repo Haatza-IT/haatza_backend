@@ -376,22 +376,24 @@ export const customerDashboardQuerySchema = z
       });
     }
 
-    // 4. territory check (must be one of the 28 Indian state codes)
-    const rawTerr = data.territory;
-    if (!rawTerr || rawTerr.trim().length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['territory'],
-        message: 'territory is required. Must be one of the 28 supported Indian state codes.',
-      });
-    } else {
-      const terr = rawTerr.trim();
-      if (rawTerr !== terr || !isIndianStateCode(terr)) {
+    // 4. territory check (must be one of the 28 Indian state codes) - HAATZA only
+    if (mod === 'HAATZA') {
+      const rawTerr = data.territory;
+      if (!rawTerr || rawTerr.trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['territory'],
-          message: `territory must be a valid 2-letter uppercase Indian state code. Received: '${rawTerr}'`,
+          message: 'territory is required. Must be one of the 28 supported Indian state codes.',
         });
+      } else {
+        const terr = rawTerr.trim();
+        if (rawTerr !== terr || !isIndianStateCode(terr)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['territory'],
+            message: `territory must be a valid 2-letter uppercase Indian state code. Received: '${rawTerr}'`,
+          });
+        }
       }
     }
 
@@ -440,10 +442,12 @@ export const customerDashboardQuerySchema = z
       }
     }
 
+    const mod = (data.module || '').toUpperCase();
+
     return {
-      module: (data.module || '').toUpperCase() as 'HAATZA' | 'LITE',
+      module: mod as 'HAATZA' | 'LITE',
       categoryId: (data.categoryId || data.category_id || '').trim(),
-      territory: (data.territory || '').trim(),
+      territory: mod === 'HAATZA' || data.raw ? (data.territory ? String(data.territory).trim() : undefined) : undefined,
       placement: (data.placement || '').trim() as AllowedPlacement,
       warehouseId: (data.warehouseId || data.warehouse_id || '').trim(),
       raw: Boolean(data.raw),

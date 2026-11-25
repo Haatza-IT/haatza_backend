@@ -24,13 +24,13 @@ export class DashboardCacheService {
   /**
    * Builds the standardized cache key
    * - HAATZA: dashboard:HAATZA:<placement>:<categoryId>:<territory>[:p<page>:l<limit>]
-   * - LITE:   dashboard:LITE:<placement>:<categoryId>:<territory>:<warehouseId>[:p<page>:l<limit>]
+   * - LITE:   dashboard:LITE:<placement>:<categoryId>:<warehouseId>[:p<page>:l<limit>]
    */
   public buildKey(
     module: string,
     placement: string,
     categoryId: string,
-    territory: string,
+    territory?: string,
     warehouseId?: string,
     page?: number,
     limit?: number,
@@ -38,7 +38,6 @@ export class DashboardCacheService {
     const mod = module.toUpperCase().trim();
     const plc = (placement || '').toUpperCase().trim();
     const cat = categoryId.trim();
-    const ter = territory.trim();
     // "No params" branch: if neither page nor limit is sent, cache key has NO :p/:l suffix
     const hasPagination = page !== undefined || limit !== undefined;
     const paginationSuffix = hasPagination
@@ -46,8 +45,9 @@ export class DashboardCacheService {
       : '';
     if (mod === 'LITE') {
       const wh = (warehouseId || '').trim();
-      return `dashboard:LITE:${plc}:${cat}:${ter}:${wh}${paginationSuffix}`;
+      return `dashboard:LITE:${plc}:${cat}:${wh}${paginationSuffix}`;
     }
+    const ter = (territory || '').trim();
     return `dashboard:HAATZA:${plc}:${cat}:${ter}${paginationSuffix}`;
   }
 

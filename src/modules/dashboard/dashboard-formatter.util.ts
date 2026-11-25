@@ -200,7 +200,7 @@ export function formatCleanWidget(raw: any): CleanDashboardWidget {
 export function formatDashboardResponse(
   module: string,
   categoryId: string,
-  territory: string,
+  territory: string | undefined,
   rawWidgets: any[],
   warehouseId?: string,
   page?: number,
@@ -241,18 +241,24 @@ export function formatDashboardResponse(
     }
   }
 
-  const response: CustomerDashboardResponse = {
+  const rawMod = module.toUpperCase();
+  if (rawMod === 'LITE') {
+    return {
+      success: true,
+      module: 'LITE',
+      categoryId: categoryId || '',
+      warehouseId: warehouseId || '',
+      count: cleanWidgets.length,
+      widgets: cleanWidgets,
+    };
+  }
+
+  return {
     success: true,
-    module: module.toUpperCase(),
+    module: 'HAATZA',
     categoryId: categoryId || '',
     territory: territory || '',
     count: cleanWidgets.length,
     widgets: cleanWidgets,
   };
-
-  if (module.toUpperCase() === 'LITE') {
-    response.warehouseId = warehouseId || '';
-  }
-
-  return response;
 }
